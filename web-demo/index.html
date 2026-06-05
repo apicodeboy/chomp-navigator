@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Chomp Navigator — themed prototype</title>
+<style>
+  :root {
+    --bg:#1a1a1e; --panel:#111114; --card:#1e1e24; --card2:#26262d; --border:#2c2c34;
+    --accent:#c4b5fd; --accent2:#a78bfa; --glow:rgba(167,139,250,.45);
+    --text:#fff; --text2:#9a9aa6; --muted:#6b6b76;
+    --success:#5bd18b; --danger:#ff5a5a; --char:#ffd400;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, system-ui, "Segoe UI", sans-serif;
+    background: radial-gradient(120% 120% at 50% 0%, #e9e0ff 0%, #d6c8f5 55%, #c9b8f0 100%);
+    min-height: 100vh; display: grid; place-items: center; padding: 22px;
+  }
+  /* Outer rounded frame with the lavender glow from the screenshot */
+  .app {
+    width: min(1280px, 96vw); height: min(820px, 92vh);
+    background: var(--bg); border: 2px solid var(--accent);
+    border-radius: 28px; overflow: hidden; display: grid;
+    grid-template-columns: 360px 1fr;
+    box-shadow: 0 0 0 6px rgba(255,255,255,.25), 0 30px 80px var(--glow);
+  }
+
+  /* ---------- Sidebar ---------- */
+  .side { background: var(--panel); display: flex; flex-direction: column; min-height: 0; }
+  .head { display: flex; align-items: center; gap: 12px; padding: 18px 18px 8px; }
+  .iconbtn { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center;
+    background: var(--card); color: var(--text2); font-size: 18px; cursor: pointer; }
+  .logo { width: 44px; height: 44px; border-radius: 12px; background: #fff; display: grid; place-items: center; }
+  .logo svg { width: 22px; height: 22px; }
+  .title { font-size: 20px; font-weight: 800; flex: 1; }
+  .search { margin: 8px 18px 14px; display: flex; align-items: center; gap: 10px;
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; }
+  .search input { background: none; border: 0; outline: 0; color: var(--text); font-size: 15px; flex: 1; }
+  .search .mag { color: var(--text2); }
+
+  .controls { padding: 0 18px 12px; display: flex; gap: 18px; }
+  .ctl .lab { color: var(--text2); font-size: 12px; margin-bottom: 6px; }
+  .chips { display: flex; gap: 8px; }
+  .chip { background: var(--card); border: 1px solid var(--border); color: var(--text);
+    border-radius: 12px; padding: 9px 12px; font-size: 13px; font-weight: 600; cursor: pointer;
+    display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .chip:hover { border-color: var(--accent2); }
+
+  .list { flex: 1; overflow-y: auto; padding: 4px 10px 16px; }
+  .list::-webkit-scrollbar { width: 8px; }
+  .list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 14px; cursor: pointer; }
+  .row:hover { background: var(--card); }
+  .row.active { background: var(--card); outline: 1px solid var(--accent2); }
+  .avatar { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center;
+    font-weight: 800; color: #15151a; font-size: 17px; flex-shrink: 0; border: 2px solid #fff2; }
+  .rmid { flex: 1; min-width: 0; }
+  .rname { font-weight: 700; font-size: 16px; }
+  .rmeta { font-size: 13px; color: var(--text2); margin-top: 2px; }
+  .rmeta .open { color: var(--success); font-weight: 600; }
+  .ricons { display: flex; flex-direction: column; align-items: center; gap: 10px; color: var(--text2); }
+  .verified { color: var(--accent); font-size: 15px; }
+  .mood { font-size: 15px; }
+
+  /* store chips at the bottom of the sidebar */
+  .store { border-top: 1px solid var(--border); padding: 12px 18px; display: flex; align-items: center; gap: 10px; }
+  .store .lbl { color: var(--text2); font-size: 12px; }
+  .swatches { display: flex; gap: 8px; margin-left: auto; }
+  .sw { width: 26px; height: 26px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
+  .sw.active { border-color: #fff; }
+
+  /* ---------- Map ---------- */
+  .map { position: relative; }
+  #stage { display: block; width: 100%; height: 100%; }
+  .legend { position: absolute; left: 16px; bottom: 16px; background: var(--overlay, rgba(17,17,20,.92));
+    border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; color: var(--text2);
+    font-size: 12px; max-width: 300px; line-height: 1.5; }
+  .legend b { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="side">
+    <div class="head">
+      <div class="iconbtn">←</div>
+      <div class="logo">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 2 L22 21 L12 16 L2 21 Z" fill="#15151a"/></svg>
+      </div>
+      <div class="title">Chomp Navigator</div>
+      <div class="iconbtn">ⓘ</div>
+    </div>
+
+    <div class="search">
+      <span class="mag">🔍</span>
+      <input id="search" placeholder="Where to?" />
+    </div>
+
+    <div class="controls">
+      <div class="ctl">
+        <div class="lab">Show me:</div>
+        <div class="chips"><div class="chip">Open Now ▾</div></div>
+      </div>
+      <div class="ctl">
+        <div class="lab">Sort by:</div>
+        <div class="chips"><div class="chip">Nearest ▾</div><div class="chip">⚙ Filters</div></div>
+      </div>
+    </div>
+
+    <div class="list" id="list"></div>
+
+    <div class="store">
+      <span class="lbl">Character</span>
+      <div class="swatches" id="swatches"></div>
+    </div>
+  </aside>
+
+  <!-- Map -->
+  <div class="map">
+    <canvas id="stage"></canvas>
+    <div class="legend">
+      Tap a place to navigate. The <b>chomper</b> eats the pellet route as it drives —
+      pellets behind it vanish. Circular markers + score pills mirror the
+      <b>outletbuddy</b> theme. Swap characters at the bottom-left (your store).
+    </div>
+  </div>
+</div>
+
+<script>
+// ---------- Skins (mirror src/store/skins.ts) ----------
+const SKINS = [
+  { id:'classic', body:'#FFD400', outline:'#A07C00' },
+  { id:'mint',    body:'#50E0B4', outline:'#147860' },
+  { id:'grape',   body:'#B478FF', outline:'#603096' },
+  { id:'coral',   body:'#FF6E6E', outline:'#962828' },
+];
+let skin = SKINS[0];
+
+// ---------- Places (generic, non-trademarked) ----------
+// fx,fy are fractional positions on the map (0..1). color/initial = avatar.
+const PLACES = [
+  { name:'Harbor Books',    dist:'0.2 mi', avatar:'#c4b5fd', initial:'H', score:100, mood:'🙂', fx:.30, fy:.24 },
+  { name:'Sunrise Diner',   dist:'0.3 mi', avatar:'#f4c2e0', initial:'S', score:80,  mood:'🙂', fx:.78, fy:.18 },
+  { name:'Greenpoint Café', dist:'0.4 mi', avatar:'#5bd18b', initial:'G', score:100, mood:'🙂', fx:.88, fy:.55 },
+  { name:'Metro Gym',       dist:'0.5 mi', avatar:'#ffd400', initial:'M', score:80,  mood:'🙂', fx:.66, fy:.78 },
+  { name:'City Museum',     dist:'0.7 mi', avatar:'#7cc4ff', initial:'C', score:15,  mood:'☹️', fx:.50, fy:.82 },
+  { name:'Pier 7 Market',   dist:'1.2 mi', avatar:'#ff9f5b', initial:'P', score:90,  mood:'🙂', fx:.20, fy:.62 },
+];
+let selected = -1;
+
+const canvas = document.getElementById('stage');
+const ctx = canvas.getContext('2d');
+let W, H, DPR;
+// chomper state
+let user = { fx:.16, fy:.88 };       // current fractional position
+let route = null, total = 0, dist = 0; // active route in PIXEL space
+
+function px(p){ return { x: p.fx * W, y: p.fy * H }; }
+
+function resize(){
+  DPR = window.devicePixelRatio || 1;
+  const r = canvas.getBoundingClientRect();
+  W = canvas.width = r.width * DPR;
+  H = canvas.height = r.height * DPR;
+}
+window.addEventListener('resize', () => { resize(); if (selected>=0) buildRoute(); });
+
+// ---------- Sidebar list ----------
+const listEl = document.getElementById('list');
+PLACES.forEach((p, i) => {
+  const row = document.createElement('div');
+  row.className = 'row';
+  row.innerHTML = `
+    <div class="avatar" style="background:${p.avatar}">${p.initial}</div>
+    <div class="rmid">
+      <div class="rname">${p.name}</div>
+      <div class="rmeta">${p.dist} • <span class="open">Open ’til 6pm</span></div>
+    </div>
+    <div class="ricons"><span class="verified">✔</span><span class="mood">${p.mood}</span></div>`;
+  row.onclick = () => selectPlace(i);
+  listEl.appendChild(row);
+});
+
+// ---------- Skin swatches ----------
+const swEl = document.getElementById('swatches');
+SKINS.forEach((s, i) => {
+  const el = document.createElement('div');
+  el.className = 'sw' + (s===skin?' active':'');
+  el.style.background = s.body;
+  el.onclick = () => { skin = s; [...swEl.children].forEach((c,j)=>c.classList.toggle('active', SKINS[j]===s)); };
+  swEl.appendChild(el);
+});
+
+function selectPlace(i){
+  selected = i;
+  [...listEl.children].forEach((r,j)=>r.classList.toggle('active', j===i));
+  // start route from the chomper's CURRENT position
+  user = { fx: user.fx, fy: user.fy };
+  buildRoute();
+}
+
+// ---------- Route (pixel space) with a bend, + pellets ----------
+const SPACING = 26; // px between pellets
+function buildRoute(){
+  if (selected < 0) { route = null; return; }
+  const a = px(user);
+  const dest = px(PLACES[selected]);
+  // control/bend point for a gentle curve
+  const mid = { x:(a.x+dest.x)/2 + (dest.y-a.y)*0.18, y:(a.y+dest.y)/2 - (dest.x-a.x)*0.18 };
+  // sample a quadratic bezier into a polyline
+  const pts = [];
+  const N = 60;
+  for (let t=0;t<=N;t++){
+    const u=t/N, iu=1-u;
+    pts.push({ x: iu*iu*a.x + 2*iu*u*mid.x + u*u*dest.x,
+               y: iu*iu*a.y + 2*iu*u*mid.y + u*u*dest.y });
+  }
+  let cum=[0];
+  for (let k=1;k<pts.length;k++) cum.push(cum[k-1]+Math.hypot(pts[k].x-pts[k-1].x, pts[k].y-pts[k-1].y));
+  total = cum[cum.length-1];
+  route = { pts, cum, pellets: [] };
+  for (let d=0; d<=total; d+=SPACING*DPR) route.pellets.push({ d, ...posAt(d) });
+  dist = 0;
+}
+function px2frac(p){ return { fx: p.x/W, fy: p.y/H }; }
+function posAt(d){
+  const {pts,cum}=route; d=Math.max(0,Math.min(d,total));
+  let i=1; while(i<cum.length && cum[i]<d) i++;
+  const seg=Math.max(cum[i]-cum[i-1],1e-6), f=(d-cum[i-1])/seg;
+  const x=pts[i-1].x+(pts[i].x-pts[i-1].x)*f, y=pts[i-1].y+(pts[i].y-pts[i-1].y)*f;
+  const ang=Math.atan2(pts[i].y-pts[i-1].y, pts[i].x-pts[i-1].x);
+  return {x,y,ang};
+}
+
+// ---------- Faint road network for map texture ----------
+let roads=[];
+function buildRoads(){
+  roads=[];
+  const rnd=(s)=>{let x=Math.sin(s)*10000;return x-Math.floor(x);};
+  for(let i=0;i<14;i++){
+    const y=rnd(i*1.7)*1; roads.push([[0,y],[1,y+ (rnd(i*3.1)-.5)*.25]]);
+    const x=rnd(i*2.3)*1; roads.push([[x,0],[x+(rnd(i*4.2)-.5)*.25,1]]);
+  }
+}
+
+// ---------- Draw ----------
+function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+function marker(p, isSel){
+  const c = px(p); const R = 26*DPR;
+  if (isSel){ ctx.beginPath(); ctx.arc(c.x,c.y,R+6*DPR,0,7); ctx.strokeStyle='#a78bfa'; ctx.lineWidth=3*DPR; ctx.stroke(); }
+  ctx.beginPath(); ctx.arc(c.x,c.y,R,0,7); ctx.fillStyle='#fff';
+  ctx.shadowColor='rgba(0,0,0,.5)'; ctx.shadowBlur=12*DPR; ctx.fill(); ctx.shadowBlur=0;
+  ctx.beginPath(); ctx.arc(c.x,c.y,R-3*DPR,0,7); ctx.fillStyle=p.avatar; ctx.fill();
+  ctx.fillStyle='#15151a'; ctx.font=`800 ${20*DPR}px system-ui`; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(p.initial, c.x, c.y+1*DPR);
+  // score pill
+  const txt = `${p.mood} ${p.score}`; ctx.font=`700 ${13*DPR}px system-ui`;
+  const w = ctx.measureText(txt).width + 20*DPR, h=26*DPR, py=c.y+R+8*DPR;
+  ctx.fillStyle='rgba(17,17,20,.92)'; roundRect(c.x-w/2, py, w, h, 13*DPR); ctx.fill();
+  ctx.strokeStyle='#2c2c34'; ctx.lineWidth=1*DPR; ctx.stroke();
+  ctx.fillStyle='#fff'; ctx.textBaseline='middle'; ctx.fillText(txt, c.x, py+h/2);
+}
+
+function draw(now){
+  if(!W){ resize(); buildRoads(); }
+  // base
+  ctx.fillStyle='#1f1f24'; ctx.fillRect(0,0,W,H);
+  // roads
+  ctx.strokeStyle='#34343c'; ctx.lineWidth=10*DPR; ctx.lineCap='round';
+  for(const [a,b] of roads){ ctx.beginPath(); ctx.moveTo(a[0]*W,a[1]*H); ctx.lineTo(b[0]*W,b[1]*H); ctx.stroke(); }
+  ctx.strokeStyle='#3c3c45'; ctx.lineWidth=4*DPR;
+  for(const [a,b] of roads){ ctx.beginPath(); ctx.moveTo(a[0]*W,a[1]*H); ctx.lineTo(b[0]*W,b[1]*H); ctx.stroke(); }
+
+  // pellet route (eat behind the chomper)
+  if(route){
+    const minVis = dist + 14*DPR;
+    for(const p of route.pellets){
+      if(p.d <= minVis) continue;
+      ctx.beginPath(); ctx.arc(p.x,p.y,5.5*DPR,0,7);
+      ctx.fillStyle=skin.body; ctx.strokeStyle=skin.outline; ctx.lineWidth=1.5*DPR; ctx.fill(); ctx.stroke();
+    }
+  }
+
+  // markers
+  PLACES.forEach((p,i)=>marker(p, i===selected));
+
+  // chomper
+  let pos;
+  if(route){ pos = posAt(dist); } else { const u=px(user); pos={x:u.x,y:u.y,ang:-Math.PI/2}; }
+  const r=18*DPR, mouth=Math.abs(Math.sin(now/90))*0.55;
+  ctx.save(); ctx.translate(pos.x,pos.y); ctx.rotate(pos.ang);
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.arc(0,0,r,mouth,Math.PI*2-mouth); ctx.closePath();
+  ctx.fillStyle=skin.body; ctx.strokeStyle=skin.outline; ctx.lineWidth=3*DPR; ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(r*0.1,-r*0.45,r*0.16,0,7); ctx.fillStyle='#201900'; ctx.fill();
+  ctx.restore();
+
+  // advance + arrival
+  if(route){
+    dist += 1.7*DPR;
+    if(dist >= total){ // arrived: park the chomper at the destination, clear route
+      user = px2frac(px(PLACES[selected]));
+      route = null;
+    }
+  }
+  requestAnimationFrame(draw);
+}
+resize(); buildRoads(); requestAnimationFrame(draw);
+</script>
+</body>
+</html>

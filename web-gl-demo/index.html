@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Chomp Navigator — real Mapbox API</title>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.css" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@7/turf.min.js"></script>
+<style>
+  :root{
+    --bg:#1a1a1e;--card:#1e1e24;--border:#2c2c34;--accent:#c4b5fd;--accent2:#a78bfa;
+    --text:#fff;--text2:#9a9aa6;--success:#5bd18b;--char:#ffd400;color-scheme:dark;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  html,body,#map{height:100%;width:100%;}
+  body{font-family:-apple-system,system-ui,sans-serif;background:var(--bg);overflow:hidden;}
+  .panel{position:fixed;top:12px;left:12px;right:12px;z-index:5;display:flex;flex-direction:column;gap:8px;}
+  .bar{display:flex;gap:8px;}
+  .bar input{flex:1;background:var(--card);border:1px solid var(--border);border-radius:14px;
+    color:var(--text);padding:13px 16px;font-size:16px;outline:0;}
+  .bar button{background:var(--accent);color:#141414;font-weight:800;border:0;border-radius:14px;
+    padding:0 18px;font-size:15px;cursor:pointer;}
+  .results{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;display:none;}
+  .results.show{display:block;}
+  .res{padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;}
+  .res:last-child{border-bottom:0;}
+  .res b{color:var(--text);font-size:15px;font-weight:600;}
+  .res span{color:var(--text2);font-size:13px;display:block;margin-top:2px;}
+  .eta{position:fixed;left:12px;right:12px;bottom:16px;z-index:5;background:rgba(17,17,20,.92);
+    border:1px solid var(--border);border-radius:16px;padding:14px 18px;display:none;
+    justify-content:space-between;align-items:center;}
+  .eta.show{display:flex;}
+  .eta .big{color:var(--text);font-size:19px;font-weight:800;}
+  .eta .sub{color:var(--success);font-size:13px;font-weight:600;margin-top:2px;}
+  .eta button{background:#2a2a31;color:#fff;border:0;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer;}
+  .token{position:fixed;inset:0;z-index:20;background:rgba(10,10,12,.96);display:flex;
+    align-items:center;justify-content:center;padding:24px;}
+  .token .box{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:24px;max-width:440px;width:100%;}
+  .token h2{font-size:18px;margin-bottom:6px;}
+  .token p{color:var(--text2);font-size:13px;line-height:1.5;margin-bottom:14px;}
+  .token input{width:100%;background:#15151a;border:1px solid var(--border);border-radius:12px;
+    color:var(--text);padding:12px 14px;font-size:14px;outline:0;margin-bottom:12px;}
+  .token button{width:100%;background:var(--accent);color:#141414;font-weight:800;border:0;border-radius:12px;padding:13px;font-size:15px;cursor:pointer;}
+  .token a{color:var(--accent);}
+  .badge{position:fixed;top:64px;right:12px;z-index:4;background:rgba(17,17,20,.9);border:1px solid var(--border);
+    border-radius:10px;padding:6px 10px;color:var(--text2);font-size:11px;}
+  .mapboxgl-ctrl-logo,.mapboxgl-ctrl-attrib{opacity:.5;}
+  .chomp{width:40px;height:40px;}
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div class="panel">
+  <div class="bar">
+    <input id="q" placeholder="Where to?" autocomplete="off" />
+    <button id="go">Go</button>
+  </div>
+  <div class="results" id="results"></div>
+</div>
+
+<div class="badge">live Mapbox API ✓</div>
+
+<div class="eta" id="eta">
+  <div><div class="big" id="etaBig">—</div><div class="sub" id="etaSub">with traffic</div></div>
+  <button id="stop">End</button>
+</div>
+
+<!-- Token gate -->
+<div class="token" id="tokenGate">
+  <div class="box">
+    <h2>🟡 Chomp Navigator — live API demo</h2>
+    <p>Paste your Mapbox <b>public</b> token (<code>pk.…</code>) to load a real map with
+    live Geocoding + Directions. Get one at
+    <a href="https://account.mapbox.com/access-tokens/" target="_blank">account.mapbox.com</a>.
+    The token stays in your browser (localStorage) and is never sent anywhere but Mapbox.</p>
+    <input id="tokenInput" placeholder="pk.eyJ1Ijoi…" />
+    <button id="tokenSave">Load map</button>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let map, userLngLat = null, routeLine = null, totalM = 0, dist = 0, anim = null, chomper = null;
+
+// ---- Token gate ----
+const saved = localStorage.getItem('mbtoken');
+if (saved) { $('tokenInput').value = saved; }
+$('tokenSave').onclick = () => {
+  const t = $('tokenInput').value.trim();
+  if (!t.startsWith('pk.')) { alert('That should start with pk.'); return; }
+  localStorage.setItem('mbtoken', t);
+  $('tokenGate').style.display = 'none';
+  initMap(t);
+};
+
+function initMap(token){
+  mapboxgl.accessToken = token;
+  map = new mapboxgl.Map({
+    container:'map', style:'mapbox://styles/mapbox/dark-v11',
+    center:[-122.4194, 37.7749], zoom:12, pitch:45,
+  });
+  map.addControl(new mapboxgl.GeolocateControl({
+    positionOptions:{enableHighAccuracy:true}, trackUserLocation:true
+  }));
+  map.on('load', () => {
+    // try to center on the user
+    navigator.geolocation?.getCurrentPosition((p) => {
+      userLngLat = [p.coords.longitude, p.coords.latitude];
+      map.flyTo({center:userLngLat, zoom:14});
+    }, () => {}, {enableHighAccuracy:true});
+
+    // pellet source + layer (the "eating" route)
+    map.addSource('pellets', {type:'geojson', data:turf.featureCollection([])});
+    map.addLayer({
+      id:'pellets', type:'circle', source:'pellets',
+      paint:{'circle-radius':5,'circle-color':'#ffd400','circle-stroke-width':1.5,'circle-stroke-color':'#a07c00'}
+    });
+
+    // the chomping character as an HTML marker
+    const el = document.createElement('div'); el.className='chomp';
+    el.innerHTML = chomperSVG();
+    chomper = new mapboxgl.Marker({element:el}); // added when navigating
+  });
+}
+
+// ---- Geocoding v6 (real API) ----
+let timer=null;
+$('q').addEventListener('input', () => {
+  clearTimeout(timer);
+  const q = $('q').value.trim();
+  if (q.length < 3){ $('results').classList.remove('show'); return; }
+  timer = setTimeout(() => geocode(q), 300);
+});
+$('go').onclick = () => { const q=$('q').value.trim(); if(q) geocode(q); };
+
+async function geocode(q){
+  const prox = userLngLat ? `&proximity=${userLngLat[0]},${userLngLat[1]}` : '';
+  const url = `https://api.mapbox.com/search/geocode/v6/forward?q=${encodeURIComponent(q)}`+
+              `&limit=6&autocomplete=true${prox}&access_token=${mapboxgl.accessToken}`;
+  const r = await fetch(url); const data = await r.json();
+  const box = $('results'); box.innerHTML='';
+  (data.features||[]).forEach(f => {
+    const div = document.createElement('div'); div.className='res';
+    const name = f.properties.name || f.properties.full_address || 'Unknown';
+    div.innerHTML = `<b>${name}</b><span>${f.properties.full_address||f.properties.place_formatted||''}</span>`;
+    div.onclick = () => { $('results').classList.remove('show'); $('q').value=name; startRoute(f.geometry.coordinates); };
+    box.appendChild(div);
+  });
+  box.classList.toggle('show', (data.features||[]).length>0);
+}
+
+// ---- Directions (real API) + pellet build ----
+async function startRoute(dest){
+  const origin = userLngLat || map.getCenter().toArray();
+  const url = `https://api.mapbox.com/directions/v5/mapbox/driving-traffic/`+
+    `${origin[0]},${origin[1]};${dest[0]},${dest[1]}`+
+    `?geometries=geojson&overview=full&steps=true&voice_instructions=true&banner_instructions=true`+
+    `&access_token=${mapboxgl.accessToken}`;
+  const r = await fetch(url); const data = await r.json();
+  if (data.code!=='Ok' || !data.routes.length){ alert('No route: '+data.code); return; }
+  const route = data.routes[0];
+  routeLine = turf.lineString(route.geometry.coordinates);
+  totalM = turf.length(routeLine, {units:'meters'}); dist = 0;
+
+  // pellets every 25 m with baked-in distance-along (the eat key)
+  const pellets=[];
+  for (let d=0; d<=totalM; d+=25)
+    pellets.push(turf.point(turf.along(routeLine, d/1000).geometry.coordinates, {d}));
+  map.getSource('pellets').setData(turf.featureCollection(pellets));
+
+  // ETA bar (traffic-aware duration from the API)
+  $('eta').classList.add('show');
+  const drive = () => {
+    const remain = totalM - dist;
+    const sec = route.duration * (remain/Math.max(route.distance,1));
+    const min = Math.max(1, Math.round(sec/60));
+    $('etaBig').textContent = `${min} min · ${(remain/1000).toFixed(1)} km`;
+  };
+
+  // place chomper, fit route, then simulate driving along it
+  chomper.setLngLat(turf.along(routeLine,0).geometry.coordinates).addTo(map);
+  const bb = turf.bbox(routeLine);
+  map.fitBounds([[bb[0],bb[1]],[bb[2],bb[3]]], {padding:60, pitch:0});
+
+  cancelAnimationFrame(anim);
+  const step = () => {
+    dist += 12; // ~ driving speed in m/frame-ish (sim)
+    const here = turf.along(routeLine, Math.min(dist,totalM)/1000).geometry.coordinates;
+    const ahead = turf.along(routeLine, Math.min(dist+10,totalM)/1000).geometry.coordinates;
+    chomper.setLngLat(here);
+    const brg = turf.bearing(turf.point(here), turf.point(ahead));
+    chomper.getElement().style.transform += ''; // keep marker; rotate inner
+    chomper.getElement().firstChild.style.transform = `rotate(${brg}deg)`;
+    // EAT: hide pellets behind the chomper via a GPU filter on distance-along
+    map.setFilter('pellets', ['>', ['get','d'], dist+12]);
+    drive();
+    if (dist < totalM) anim = requestAnimationFrame(step);
+    else { $('etaBig').textContent='Arrived 🎉'; $('etaSub').textContent='you ate the whole route'; }
+  };
+  map.once('moveend', () => { map.easeTo({center:turf.along(routeLine,0).geometry.coordinates, zoom:15, pitch:55}); step(); });
+}
+
+$('stop').onclick = () => {
+  cancelAnimationFrame(anim);
+  $('eta').classList.remove('show');
+  map.getSource('pellets').setData(turf.featureCollection([]));
+  chomper && chomper.remove();
+};
+
+// chomping-circle SVG (generic, non-trademarked)
+function chomperSVG(){
+  return `<svg viewBox="0 0 40 40" style="display:block;transition:transform .15s">
+    <path d="M20 20 L38 9 A20 20 0 1 0 38 31 Z" fill="#ffd400" stroke="#a07c00" stroke-width="2"/>
+    <circle cx="22" cy="11" r="2.4" fill="#201900"/></svg>`;
+}
+
+// auto-open map if token already saved
+if (saved){ $('tokenGate').style.display='none'; initMap(saved); }
+</script>
+</body>
+</html>

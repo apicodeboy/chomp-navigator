@@ -1,0 +1,5 @@
+# Alternative one-shot deploy: drag this repo's `web-gl-demo/` folder onto
+# https://app.netlify.com/drop, or connect this repo — Netlify will publish it.
+[build]
+  publish = "web-gl-demo"
+  command = ""

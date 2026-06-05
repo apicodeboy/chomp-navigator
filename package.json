@@ -1,0 +1,35 @@
+{
+  "name": "my-maps-app",
+  "version": "1.0.0",
+  "main": "node_modules/expo/AppEntry.js",
+  "scripts": {
+    "start": "expo start --dev-client",
+    "ios": "expo run:ios",
+    "android": "expo run:android",
+    "prebuild": "expo prebuild --clean",
+    "sprite": "node scripts/make-placeholder-sprite.js",
+    "tsc": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "1.23.1",
+    "@rnmapbox/maps": "~10.1.33",
+    "@turf/turf": "^7.2.0",
+    "expo": "~52.0.0",
+    "expo-constants": "~17.0.0",
+    "expo-dev-client": "~5.0.0",
+    "expo-location": "~18.0.0",
+    "expo-speech": "~13.0.0",
+    "expo-status-bar": "~2.0.0",
+    "react": "18.3.1",
+    "react-native": "0.76.5",
+    "react-native-purchases": "^8.2.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.0",
+    "@types/react": "~18.3.12",
+    "dotenv": "^16.4.5",
+    "qrcode": "^1.5.4",
+    "typescript": "~5.3.3"
+  },
+  "private": true
+}
