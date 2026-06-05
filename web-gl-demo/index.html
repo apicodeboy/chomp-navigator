@@ -84,9 +84,23 @@
 const $ = (id) => document.getElementById(id);
 let map, userLngLat = null, routeLine = null, totalM = 0, dist = 0, anim = null, chomper = null;
 
-// ---- Token gate ----
-const saved = localStorage.getItem('mbtoken');
-if (saved) { $('tokenInput').value = saved; }
+// The token can be supplied in the URL (#token=pk… or ?token=pk…) so a QR code can
+// carry it WITHOUT committing the token into this public repo. Once loaded it's saved
+// to localStorage, so future opens are instant. Falls back to the paste gate.
+function tokenFromUrl() {
+  const h = new URLSearchParams(location.hash.replace(/^#/, '')).get('token');
+  const q = new URLSearchParams(location.search).get('token');
+  return h || q;
+}
+
+// ---- Token gate (skipped when we already have a token) ----
+const saved = tokenFromUrl() || localStorage.getItem('mbtoken');
+if (saved) {
+  localStorage.setItem('mbtoken', saved);
+  $('tokenInput').value = saved;
+  // clean the token out of the visible URL bar
+  if (tokenFromUrl()) history.replaceState(null, '', location.pathname);
+}
 $('tokenSave').onclick = () => {
   const t = $('tokenInput').value.trim();
   if (!t.startsWith('pk.')) { alert('That should start with pk.'); return; }
@@ -99,7 +113,7 @@ function initMap(token){
   mapboxgl.accessToken = token;
   map = new mapboxgl.Map({
     container:'map', style:'mapbox://styles/mapbox/dark-v11',
-    center:[-122.4194, 37.7749], zoom:12, pitch:45,
+    center:[-122.4194, 37.7749], zoom:12, pitch:0,
   });
   map.addControl(new mapboxgl.GeolocateControl({
     positionOptions:{enableHighAccuracy:true}, trackUserLocation:true
