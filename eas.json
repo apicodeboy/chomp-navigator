@@ -7,34 +7,23 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "ios": { "simulator": false },
-      "env": {
-        "MAPBOX_PUBLIC_TOKEN": "$MAPBOX_PUBLIC_TOKEN",
-        "MAPBOX_DOWNLOAD_TOKEN": "$MAPBOX_DOWNLOAD_TOKEN"
-      }
+      "environment": "development",
+      "android": { "buildType": "apk" },
+      "ios": { "simulator": false }
     },
     "development-simulator": {
       "developmentClient": true,
       "distribution": "internal",
-      "ios": { "simulator": true },
-      "env": {
-        "MAPBOX_PUBLIC_TOKEN": "$MAPBOX_PUBLIC_TOKEN",
-        "MAPBOX_DOWNLOAD_TOKEN": "$MAPBOX_DOWNLOAD_TOKEN"
-      }
+      "environment": "development",
+      "ios": { "simulator": true }
     },
     "preview": {
       "distribution": "internal",
-      "env": {
-        "MAPBOX_PUBLIC_TOKEN": "$MAPBOX_PUBLIC_TOKEN",
-        "MAPBOX_DOWNLOAD_TOKEN": "$MAPBOX_DOWNLOAD_TOKEN"
-      }
+      "environment": "preview"
     },
     "production": {
       "autoIncrement": true,
-      "env": {
-        "MAPBOX_PUBLIC_TOKEN": "$MAPBOX_PUBLIC_TOKEN",
-        "MAPBOX_DOWNLOAD_TOKEN": "$MAPBOX_DOWNLOAD_TOKEN"
-      }
+      "environment": "production"
     }
   },
   "submit": {

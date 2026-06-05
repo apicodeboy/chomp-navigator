@@ -15,6 +15,7 @@ const DOWNLOAD_TOKEN = process.env.MAPBOX_DOWNLOAD_TOKEN ?? '';
 const config: ExpoConfig = {
   name: 'Chomp Navigator',
   slug: 'my-maps-app',
+  owner: 'apicodeboy',
   version: '1.0.0',
   orientation: 'portrait',
   scheme: 'chompnav',
@@ -64,6 +65,7 @@ const config: ExpoConfig = {
     // RevenueCat public SDK keys (safe to ship — they're client keys).
     rcIosKey: process.env.REVENUECAT_IOS_KEY ?? '',
     rcAndroidKey: process.env.REVENUECAT_ANDROID_KEY ?? '',
+    eas: { projectId: '641a1b7b-9ffd-4fa0-b5fd-4a1c08b31ae5' },
   },
 };
 
