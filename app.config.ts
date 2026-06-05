@@ -45,6 +45,14 @@ const config: ExpoConfig = {
   plugins: [
     'expo-dev-client',
     [
+      // Pin Android Kotlin to 1.9.25 — expo-modules-core's Compose Compiler 1.5.15
+      // requires it (SDK 52's default 1.9.24 fails compileDebugKotlin).
+      'expo-build-properties',
+      {
+        android: { kotlinVersion: '1.9.25' },
+      },
+    ],
+    [
       '@rnmapbox/maps',
       {
         // The native SDK download needs the SECRET token at build time.
