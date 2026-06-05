@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import Mapbox from '@rnmapbox/maps';
 import { featureCollection } from '@turf/turf';
+import { theme } from '@/theme';
 import type { Pellet } from '@/types/navigation';
 
 interface Props {
@@ -44,11 +45,11 @@ export default function RouteLayers({ pellets, distAlong, leadM }: Props) {
         filter={['>', ['get', 'distAlong'], minVisible]}
         style={{
           circleRadius: 6,
-          circleColor: '#FFD400', // pellet yellow — recolor per character "skin" later
+          circleColor: theme.colors.accent, // orange pellets to match the theme
           circleStrokeWidth: 1.5,
-          circleStrokeColor: '#A07C00',
+          circleStrokeColor: theme.colors.characterOutline,
           circlePitchAlignment: 'map', // pellets lie flat on the ground as you tilt
-          circleEmissiveStrength: 1, // glow a bit on the night style
+          circleEmissiveStrength: 1,
         }}
       />
     </Mapbox.ShapeSource>

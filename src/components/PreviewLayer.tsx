@@ -23,7 +23,7 @@ export default function PreviewLayer({ line }: Props) {
         <Mapbox.LineLayer
           id="preview-casing"
           style={{
-            lineColor: '#3a2f63',
+            lineColor: theme.colors.characterOutline,
             lineWidth: 9,
             lineCap: 'round',
             lineJoin: 'round',

@@ -73,11 +73,11 @@ location via **Debug → Simulate Location → Freeway Drive**.
 
 ## 5·0 Theme
 
-The app uses a central design system in [src/theme.ts](src/theme.ts) — the dark
-"outletbuddy" look: near-black surfaces, a lavender/purple accent (`#a78bfa`) with a
-soft glow, rounded cards, and green "open/go" status. Components import `theme`
-instead of hardcoding colors, and the map uses Mapbox's `dark-v11` style. To restyle
-the whole app, edit `theme.ts` in one place.
+The app uses a central design system in [src/theme.ts](src/theme.ts) — a light
+neumorphic look with a vibrant **orange** accent (`#f26101`): off-white surfaces,
+soft cards, green "available/go" status. Components import `theme` instead of
+hardcoding colors, and the map uses Mapbox's `light-v11` style. To restyle the whole
+app, edit `theme.ts` in one place.
 
 A browser prototype of this theme (sidebar + search/filters + map markers with score
 pills + the chomping pellet route) lives in [web-demo/index.html](web-demo/index.html):

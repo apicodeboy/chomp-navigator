@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
   cancelText: { color: theme.colors.textPrimary, fontWeight: '700', fontSize: 16 },
   startBtn: { flex: 2, paddingVertical: 14, borderRadius: theme.radius.sm, backgroundColor: theme.colors.accent, alignItems: 'center' },
   startBtnDisabled: { opacity: 0.5 },
-  startText: { color: '#141414', fontWeight: '800', fontSize: 16 },
+  startText: { color: theme.colors.onAccent, fontWeight: '800', fontSize: 16 },
 
   arrived: { ...card, bottom: 24, alignItems: 'center', gap: 12 },
   arrivedText: { color: theme.colors.textPrimary, fontSize: 20, fontWeight: '800' },

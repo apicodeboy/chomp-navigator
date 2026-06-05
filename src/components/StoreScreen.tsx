@@ -54,7 +54,7 @@ function SkinTile({ skin }: { skin: SkinListing }) {
         disabled={busy || equipped}
       >
         {busy ? (
-          <ActivityIndicator color="#141414" />
+          <ActivityIndicator color={theme.colors.onAccent} />
         ) : (
           <Text style={[styles.btnText, equipped && styles.btnTextEquipped]}>
             {equipped ? 'Equipped' : owned ? 'Equip' : formatPrice(skin.priceCents)}
@@ -148,7 +148,7 @@ const styles = StyleSheet.create({
   btnBuy: { backgroundColor: theme.colors.accent },
   btnEquip: { backgroundColor: theme.colors.accentStrong },
   btnEquipped: { backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border },
-  btnText: { color: '#141414', fontWeight: '800', fontSize: 14 },
+  btnText: { color: theme.colors.onAccent, fontWeight: '800', fontSize: 14 },
   btnTextEquipped: { color: theme.colors.textSecondary },
   footer: { alignItems: 'center', paddingTop: 18, gap: 6 },
   restore: { color: theme.colors.accent, fontSize: 14, fontWeight: '600' },
