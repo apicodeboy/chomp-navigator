@@ -9,98 +9,106 @@
 <script src="https://cdn.jsdelivr.net/npm/@turf/turf@7/turf.min.js"></script>
 <style>
   :root{
-    --bg:#ececec; --card:#ffffff; --muted-bg:#f4f4f4;
-    --accent:#f26101; --accent-soft:#ffe6d6;
-    --text:#1c1c1e; --text2:#8a8a8e; --line:#e2e2e2;
-    --shadow:#cfcfcf; --hi:#ffffff;
-    color-scheme: light;
+    --accent:#ffc400; --accent2:#e6a700; --accent-dark:#7a5e00;
+    --card:#ffffff; --muted:#f1f1f3; --text:#1c1c1e; --text2:#8a8a8e;
+    --ctrl:#ffffff; --ctrl-ic:#2b2b2e; --shadow:rgba(0,0,0,.28);
+    color-scheme:dark;
   }
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
   html,body,#map{height:100%;width:100%;}
-  body{font-family:-apple-system,system-ui,sans-serif;background:var(--bg);overflow:hidden;color:var(--text);}
+  body{font-family:-apple-system,system-ui,sans-serif;background:#15151a;overflow:hidden;color:var(--text);}
 
-  /* soft neumorphic surfaces */
-  .soft{ background:var(--card); border-radius:20px;
-    box-shadow:6px 6px 14px var(--shadow), -6px -6px 14px var(--hi); }
+  /* top: dark circular buttons + search */
+  .top{position:fixed;top:14px;left:14px;right:14px;z-index:5;display:flex;gap:10px;align-items:center;}
+  .dot-btn{width:46px;height:46px;border-radius:50%;flex:0 0 auto;display:grid;place-items:center;
+    background:rgba(28,28,32,.66);backdrop-filter:blur(8px);color:#fff;font-size:18px;cursor:pointer;border:0;}
+  .field{flex:1;display:flex;align-items:center;gap:10px;background:var(--card);border-radius:16px;
+    padding:13px 16px;box-shadow:0 6px 18px var(--shadow);}
+  .field input{flex:1;background:none;border:0;outline:0;color:var(--text);font-size:16px;}
+  .field input::placeholder{color:var(--text2);}
+  .field .mag{color:var(--accent2);font-weight:700;}
+  .field .go{background:var(--accent);color:#1c1c1e;font-weight:800;border:0;border-radius:11px;padding:9px 14px;cursor:pointer;}
 
-  .panel{position:fixed;top:14px;left:14px;right:14px;z-index:5;display:flex;flex-direction:column;gap:10px;}
-  .bar{display:flex;gap:10px;align-items:center;}
-  .bar .field{flex:1;display:flex;align-items:center;gap:10px;padding:14px 18px;border-radius:18px;
-    background:var(--card); box-shadow:inset 3px 3px 7px var(--shadow), inset -3px -3px 7px var(--hi);}
-  .bar input{flex:1;background:none;border:0;outline:0;color:var(--text);font-size:16px;}
-  .bar input::placeholder{color:var(--text2);}
-  .bar .mag{color:var(--accent);font-weight:700;}
-  .bar button{background:var(--accent);color:#fff;font-weight:800;border:0;border-radius:16px;
-    padding:0 20px;height:50px;font-size:15px;cursor:pointer;box-shadow:4px 4px 10px var(--shadow);}
-
-  .results{border-radius:18px;overflow:hidden;display:none;}
+  .results{position:fixed;top:74px;left:70px;right:14px;z-index:5;background:var(--card);border-radius:16px;
+    overflow:hidden;display:none;box-shadow:0 10px 26px var(--shadow);}
   .results.show{display:block;}
-  .res{padding:13px 18px;border-bottom:1px solid var(--line);cursor:pointer;}
+  .res{padding:13px 16px;border-bottom:1px solid #eee;cursor:pointer;}
   .res:last-child{border-bottom:0;}
   .res b{font-size:15px;font-weight:600;}
   .res span{color:var(--text2);font-size:13px;display:block;margin-top:2px;}
 
-  /* bottom ETA card */
-  .eta{position:fixed;left:14px;right:14px;bottom:18px;z-index:5;padding:18px 20px;
-    display:none;justify-content:space-between;align-items:center;}
+  /* Apple-Maps-style control stack (right) */
+  .controls{position:fixed;right:14px;top:50%;transform:translateY(-50%);z-index:6;display:flex;flex-direction:column;gap:12px;align-items:center;}
+  .group{background:var(--ctrl);border-radius:22px;box-shadow:0 6px 18px var(--shadow);overflow:hidden;display:flex;flex-direction:column;}
+  .ctrl{width:46px;height:46px;border:0;background:var(--ctrl);color:var(--ctrl-ic);cursor:pointer;
+    display:grid;place-items:center;font-size:20px;font-weight:700;}
+  .ctrl+.ctrl{border-top:1px solid #ececec;}
+  .ctrl.round{border-radius:50%;box-shadow:0 6px 18px var(--shadow);}
+  .ctrl.on{background:var(--accent);color:#1c1c1e;}
+  .ctrl svg{width:22px;height:22px;}
+
+  /* bottom white ETA card */
+  .eta{position:fixed;left:14px;right:14px;bottom:18px;z-index:5;background:var(--card);border-radius:20px;
+    padding:18px 20px;display:none;justify-content:space-between;align-items:center;box-shadow:0 10px 28px var(--shadow);}
   .eta.show{display:flex;}
   .eta .big{font-size:20px;font-weight:800;}
-  .eta .sub{color:var(--accent);font-size:13px;font-weight:700;margin-top:2px;}
-  .eta button{background:var(--muted-bg);color:var(--text);border:0;border-radius:14px;padding:12px 16px;font-weight:700;cursor:pointer;
-    box-shadow:3px 3px 8px var(--shadow), -3px -3px 8px var(--hi);}
+  .eta .sub{color:var(--accent2);font-size:13px;font-weight:700;margin-top:2px;}
+  .eta .stop{background:var(--muted);color:var(--text);border:0;border-radius:13px;padding:12px 16px;font-weight:700;cursor:pointer;}
 
-  /* floating round buttons (right rail) */
-  .fabs{position:fixed;right:14px;bottom:110px;z-index:6;display:flex;flex-direction:column;gap:12px;}
-  .fab{width:54px;height:54px;border-radius:50%;border:0;cursor:pointer;display:grid;place-items:center;
-    background:var(--card);color:var(--text);font-size:22px;
-    box-shadow:5px 5px 12px var(--shadow), -5px -5px 12px var(--hi);}
-  .fab.active{background:var(--accent);color:#fff;box-shadow:4px 4px 12px var(--shadow);}
-  .fab small{font-size:9px;font-weight:800;letter-spacing:.3px;margin-top:-2px;}
+  .badge{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:3;background:rgba(28,28,32,.6);
+    color:#ffd84d;font-size:11px;font-weight:700;padding:6px 12px;border-radius:20px;backdrop-filter:blur(6px);}
+  .eta.show ~ .badge{display:none;}
 
-  .badge{position:fixed;top:78px;right:14px;z-index:4;background:var(--card);border-radius:12px;
-    padding:7px 11px;color:var(--accent);font-size:11px;font-weight:700;
-    box-shadow:3px 3px 8px var(--shadow), -3px -3px 8px var(--hi);}
-
-  .token{position:fixed;inset:0;z-index:20;background:rgba(236,236,236,.96);display:flex;align-items:center;justify-content:center;padding:24px;}
-  .token .box{padding:26px;max-width:440px;width:100%;}
+  .token{position:fixed;inset:0;z-index:20;background:rgba(10,10,12,.95);display:flex;align-items:center;justify-content:center;padding:24px;}
+  .token .box{background:var(--card);border-radius:18px;padding:26px;max-width:440px;width:100%;}
   .token h2{font-size:18px;margin-bottom:6px;}
   .token p{color:var(--text2);font-size:13px;line-height:1.5;margin-bottom:14px;}
-  .token input{width:100%;background:var(--muted-bg);border:0;border-radius:12px;color:var(--text);padding:12px 14px;font-size:14px;outline:0;margin-bottom:12px;
-    box-shadow:inset 3px 3px 7px var(--shadow), inset -3px -3px 7px var(--hi);}
-  .token button{width:100%;background:var(--accent);color:#fff;font-weight:800;border:0;border-radius:14px;padding:14px;font-size:15px;cursor:pointer;}
-  .token a{color:var(--accent);}
-  .mapboxgl-ctrl-logo,.mapboxgl-ctrl-attrib{opacity:.5;}
+  .token input{width:100%;background:var(--muted);border:0;border-radius:12px;color:var(--text);padding:12px 14px;font-size:14px;outline:0;margin-bottom:12px;}
+  .token button{width:100%;background:var(--accent);color:#1c1c1e;font-weight:800;border:0;border-radius:14px;padding:14px;font-size:15px;cursor:pointer;}
+  .token a{color:var(--accent2);}
+  .mapboxgl-ctrl-logo,.mapboxgl-ctrl-attrib{opacity:.4;}
   .chomp{width:40px;height:40px;}
 </style>
 </head>
 <body>
 <div id="map"></div>
 
-<div class="panel">
-  <div class="bar">
-    <div class="field"><span class="mag">🔍</span><input id="q" placeholder="Where to?" autocomplete="off" /></div>
-    <button id="go">Go</button>
+<div class="top">
+  <button class="dot-btn" id="backBtn">‹</button>
+  <div class="field"><span class="mag">🔍</span><input id="q" placeholder="Where to?" autocomplete="off" /><button class="go" id="go">Go</button></div>
+  <button class="dot-btn" id="bell">🔔</button>
+</div>
+<div class="results" id="results"></div>
+
+<!-- Apple-Maps-style controls on the right -->
+<div class="controls">
+  <button class="ctrl round" id="layersBtn" title="Map type">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3 2 8l10 5 10-5-10-5Z"/><path d="M2 13l10 5 10-5"/></svg>
+  </button>
+  <button class="ctrl round" id="followBtn" title="Follow">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3.2"/><circle cx="12" cy="12" r="8"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg>
+  </button>
+  <button class="ctrl round" id="locBtn" title="My location">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 11l18-8-8 18-2-8-8-2Z"/></svg>
+  </button>
+  <div class="group">
+    <button class="ctrl" id="zoomIn">+</button>
+    <button class="ctrl" id="zoomOut">−</button>
   </div>
-  <div class="results soft" id="results"></div>
+  <button class="ctrl round" id="compassBtn" title="North">
+    <svg viewBox="0 0 24 24" fill="none"><path d="M12 3l3 9-3-2-3 2 3-9Z" fill="#ff3b30"/><path d="M12 21l-3-9 3 2 3-2-3 9Z" fill="#9a9aa6"/></svg>
+  </button>
 </div>
 
+<div class="eta" id="eta">
+  <div><div class="big" id="etaBig">—</div><div class="sub" id="etaSub">with traffic</div></div>
+  <button class="stop" id="stop">End</button>
+</div>
 <div class="badge">live Mapbox API</div>
 
-<!-- Floating controls -->
-<div class="fabs">
-  <button class="fab" id="followBtn" title="Follow">🎯<small>FOLLOW</small></button>
-  <button class="fab" id="locBtn" title="My location">📍</button>
-</div>
-
-<div class="eta soft" id="eta">
-  <div><div class="big" id="etaBig">—</div><div class="sub" id="etaSub">with traffic</div></div>
-  <button id="stop">End</button>
-</div>
-
-<!-- Token gate -->
 <div class="token" id="tokenGate">
-  <div class="box soft">
-    <h2>🟠 Chomp Navigator — live API demo</h2>
+  <div class="box">
+    <h2>🟡 Chomp Navigator — live API demo</h2>
     <p>Paste your Mapbox <b>public</b> token (<code>pk.…</code>) to load a real map with
     live Geocoding + Directions. Get one at
     <a href="https://account.mapbox.com/access-tokens/" target="_blank">account.mapbox.com</a>.</p>
@@ -111,151 +119,130 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
-let map, userLngLat = null, routeLine = null, totalM = 0, dist = 0, anim = null, chomper = null;
-let followMode = false;
+let map, userLngLat=null, routeLine=null, totalM=0, dist=0, anim=null, chomper=null, followMode=false;
+let pelletData = turf.featureCollection([]);
 
-// Token via URL (#token=pk… or ?token=pk…) so a QR can carry it without committing it.
-function tokenFromUrl() {
-  const h = new URLSearchParams(location.hash.replace(/^#/, '')).get('token');
-  const q = new URLSearchParams(location.search).get('token');
-  return h || q;
+// dark + a couple alternates for the layers button
+const STYLES = ['mapbox://styles/mapbox/dark-v11','mapbox://styles/mapbox/standard-satellite','mapbox://styles/mapbox/streets-v12'];
+let styleIdx = 0;
+
+function tokenFromUrl(){
+  const h=new URLSearchParams(location.hash.replace(/^#/,'')).get('token');
+  const q=new URLSearchParams(location.search).get('token');
+  return h||q;
 }
 const saved = tokenFromUrl() || localStorage.getItem('mbtoken');
-if (saved) {
-  localStorage.setItem('mbtoken', saved);
-  $('tokenInput').value = saved;
-  if (tokenFromUrl()) history.replaceState(null, '', location.pathname);
-}
+if (saved){ localStorage.setItem('mbtoken',saved); $('tokenInput').value=saved; if(tokenFromUrl()) history.replaceState(null,'',location.pathname); }
 
 $('tokenSave').onclick = () => {
-  const t = $('tokenInput').value.trim();
-  if (!t.startsWith('pk.')) { alert('That should start with pk.'); return; }
-  localStorage.setItem('mbtoken', t);
-  $('tokenGate').style.display = 'none';
-  initMap(t);
+  const t=$('tokenInput').value.trim();
+  if(!t.startsWith('pk.')){ alert('That should start with pk.'); return; }
+  localStorage.setItem('mbtoken',t); $('tokenGate').style.display='none'; initMap(t);
 };
 
 function initMap(token){
   mapboxgl.accessToken = token;
-  map = new mapboxgl.Map({
-    container:'map', style:'mapbox://styles/mapbox/light-v11',
-    center:[-122.4194, 37.7749], zoom:12, pitch:0,
-  });
-  map.addControl(new mapboxgl.GeolocateControl({positionOptions:{enableHighAccuracy:true}, trackUserLocation:true}));
-  map.on('dragstart', () => setFollow(false)); // user takes over → stop following
-
+  map = new mapboxgl.Map({container:'map', style:STYLES[styleIdx], center:[-122.4194,37.7749], zoom:12, pitch:0});
+  map.on('dragstart', () => setFollow(false));
+  map.on('style.load', ensureLayers);   // re-add pellets after any style switch
   map.on('load', () => {
-    navigator.geolocation?.getCurrentPosition((p) => {
-      userLngLat = [p.coords.longitude, p.coords.latitude];
-      map.flyTo({center:userLngLat, zoom:14});
-    }, () => {}, {enableHighAccuracy:true});
-
-    map.addSource('pellets', {type:'geojson', data:turf.featureCollection([])});
-    map.addLayer({ id:'pellets', type:'circle', source:'pellets',
-      paint:{'circle-radius':5,'circle-color':'#f26101','circle-stroke-width':1.5,'circle-stroke-color':'#b8480a'} });
-
-    const el = document.createElement('div'); el.className='chomp'; el.innerHTML = chomperSVG();
-    chomper = new mapboxgl.Marker({element:el});
+    navigator.geolocation?.getCurrentPosition((p)=>{ userLngLat=[p.coords.longitude,p.coords.latitude]; map.flyTo({center:userLngLat,zoom:14}); },()=>{}, {enableHighAccuracy:true});
+    const el=document.createElement('div'); el.className='chomp'; el.innerHTML=chomperSVG();
+    chomper=new mapboxgl.Marker({element:el});
   });
 }
 
-// ---- Follow toggle (the route-mover chase cam) ----
+// (re)create the pellet source + layer for the current style
+function ensureLayers(){
+  if(!map.getSource('pellets')){
+    map.addSource('pellets',{type:'geojson',data:pelletData});
+    map.addLayer({id:'pellets',type:'circle',source:'pellets',
+      paint:{'circle-radius':5,'circle-color':'#ffc400','circle-stroke-width':1.5,'circle-stroke-color':'#7a5e00'}});
+  } else { map.getSource('pellets').setData(pelletData); }
+  if(routeLine) map.setFilter('pellets',['>',['get','d'],dist+12]);
+}
+
+// ---- right-side controls (Apple-Maps style) ----
+$('zoomIn').onclick  = () => map.zoomIn();
+$('zoomOut').onclick = () => map.zoomOut();
+$('compassBtn').onclick = () => map.easeTo({bearing:0, pitch:0, duration:500});
+$('locBtn').onclick = () => { if(userLngLat) map.easeTo({center:userLngLat, zoom:15, duration:600}); };
+$('layersBtn').onclick = () => { styleIdx=(styleIdx+1)%STYLES.length; map.setStyle(STYLES[styleIdx]); };
+$('backBtn').onclick = () => $('stop').click();
+
 function setFollow(on){
-  followMode = on;
-  $('followBtn').classList.toggle('active', on);
-  if (on && routeLine){
-    const here = turf.along(routeLine, Math.min(dist,totalM)/1000).geometry.coordinates;
-    map.easeTo({center:here, zoom:16.5, pitch:50, duration:600});
-  }
+  followMode=on; $('followBtn').classList.toggle('on',on);
+  if(on && routeLine){ const here=turf.along(routeLine,Math.min(dist,totalM)/1000).geometry.coordinates; map.easeTo({center:here,zoom:16.5,pitch:50,duration:600}); }
 }
 $('followBtn').onclick = () => setFollow(!followMode);
-$('locBtn').onclick = () => { if (userLngLat) map.easeTo({center:userLngLat, zoom:15, duration:600}); };
 
 // ---- Geocoding v6 ----
 let timer=null;
-$('q').addEventListener('input', () => {
-  clearTimeout(timer);
-  const q = $('q').value.trim();
-  if (q.length < 3){ $('results').classList.remove('show'); return; }
-  timer = setTimeout(() => geocode(q), 300);
-});
+$('q').addEventListener('input', () => { clearTimeout(timer); const q=$('q').value.trim();
+  if(q.length<3){ $('results').classList.remove('show'); return; } timer=setTimeout(()=>geocode(q),300); });
 $('go').onclick = () => { const q=$('q').value.trim(); if(q) geocode(q); };
 
 async function geocode(q){
-  const prox = userLngLat ? `&proximity=${userLngLat[0]},${userLngLat[1]}` : '';
-  const url = `https://api.mapbox.com/search/geocode/v6/forward?q=${encodeURIComponent(q)}`+
-              `&limit=6&autocomplete=true${prox}&access_token=${mapboxgl.accessToken}`;
-  const data = await (await fetch(url)).json();
-  const box = $('results'); box.innerHTML='';
-  (data.features||[]).forEach(f => {
-    const div = document.createElement('div'); div.className='res';
-    const name = f.properties.name || f.properties.full_address || 'Unknown';
-    div.innerHTML = `<b>${name}</b><span>${f.properties.full_address||f.properties.place_formatted||''}</span>`;
-    div.onclick = () => { $('results').classList.remove('show'); $('q').value=name; startRoute(f.geometry.coordinates); };
-    box.appendChild(div);
-  });
-  box.classList.toggle('show', (data.features||[]).length>0);
+  const prox=userLngLat?`&proximity=${userLngLat[0]},${userLngLat[1]}`:'';
+  const url=`https://api.mapbox.com/search/geocode/v6/forward?q=${encodeURIComponent(q)}&limit=6&autocomplete=true${prox}&access_token=${mapboxgl.accessToken}`;
+  const data=await (await fetch(url)).json();
+  const box=$('results'); box.innerHTML='';
+  (data.features||[]).forEach(f=>{ const div=document.createElement('div'); div.className='res';
+    const name=f.properties.name||f.properties.full_address||'Unknown';
+    div.innerHTML=`<b>${name}</b><span>${f.properties.full_address||f.properties.place_formatted||''}</span>`;
+    div.onclick=()=>{ $('results').classList.remove('show'); $('q').value=name; startRoute(f.geometry.coordinates); };
+    box.appendChild(div); });
+  box.classList.toggle('show',(data.features||[]).length>0);
 }
 
 // ---- Directions + pellet drive ----
 async function startRoute(dest){
-  const origin = userLngLat || map.getCenter().toArray();
-  const url = `https://api.mapbox.com/directions/v5/mapbox/driving-traffic/`+
-    `${origin[0]},${origin[1]};${dest[0]},${dest[1]}`+
-    `?geometries=geojson&overview=full&steps=true&access_token=${mapboxgl.accessToken}`;
-  const data = await (await fetch(url)).json();
-  if (data.code!=='Ok' || !data.routes.length){ alert('No route: '+data.code); return; }
-  const route = data.routes[0];
-  routeLine = turf.lineString(route.geometry.coordinates);
-  totalM = turf.length(routeLine, {units:'meters'}); dist = 0;
+  const origin=userLngLat||map.getCenter().toArray();
+  const url=`https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${origin[0]},${origin[1]};${dest[0]},${dest[1]}?geometries=geojson&overview=full&steps=true&access_token=${mapboxgl.accessToken}`;
+  const data=await (await fetch(url)).json();
+  if(data.code!=='Ok'||!data.routes.length){ alert('No route: '+data.code); return; }
+  const route=data.routes[0];
+  routeLine=turf.lineString(route.geometry.coordinates);
+  totalM=turf.length(routeLine,{units:'meters'}); dist=0;
 
   const pellets=[];
-  for (let d=0; d<=totalM; d+=25) pellets.push(turf.point(turf.along(routeLine, d/1000).geometry.coordinates, {d}));
-  map.getSource('pellets').setData(turf.featureCollection(pellets));
+  for(let d=0; d<=totalM; d+=25) pellets.push(turf.point(turf.along(routeLine,d/1000).geometry.coordinates,{d}));
+  pelletData=turf.featureCollection(pellets);
+  map.getSource('pellets').setData(pelletData);
 
   $('eta').classList.add('show');
-  const drive = () => {
-    const remain = totalM - dist;
-    const sec = route.duration * (remain/Math.max(route.distance,1));
-    $('etaBig').textContent = `${Math.max(1,Math.round(sec/60))} min · ${(remain/1000).toFixed(1)} km`;
-  };
+  const drive=()=>{ const remain=totalM-dist; const sec=route.duration*(remain/Math.max(route.distance,1));
+    $('etaBig').textContent=`${Math.max(1,Math.round(sec/60))} min · ${(remain/1000).toFixed(1)} km`; };
 
   chomper.setLngLat(turf.along(routeLine,0).geometry.coordinates).addTo(map);
-  const bb = turf.bbox(routeLine);
-  map.fitBounds([[bb[0],bb[1]],[bb[2],bb[3]]], {padding:70, pitch:0});
+  const bb=turf.bbox(routeLine); map.fitBounds([[bb[0],bb[1]],[bb[2],bb[3]]],{padding:70,pitch:0});
 
   cancelAnimationFrame(anim);
-  const step = () => {
-    dist += 12;
-    const here = turf.along(routeLine, Math.min(dist,totalM)/1000).geometry.coordinates;
-    const ahead = turf.along(routeLine, Math.min(dist+10,totalM)/1000).geometry.coordinates;
+  const step=()=>{ dist+=12;
+    const here=turf.along(routeLine,Math.min(dist,totalM)/1000).geometry.coordinates;
+    const ahead=turf.along(routeLine,Math.min(dist+10,totalM)/1000).geometry.coordinates;
     chomper.setLngLat(here);
-    chomper.getElement().firstChild.style.transform = `rotate(${turf.bearing(turf.point(here),turf.point(ahead))}deg)`;
-    map.setFilter('pellets', ['>', ['get','d'], dist+12]);
-    if (followMode) map.jumpTo({center:here}); // chase the route-mover
+    chomper.getElement().firstChild.style.transform=`rotate(${turf.bearing(turf.point(here),turf.point(ahead))}deg)`;
+    map.setFilter('pellets',['>',['get','d'],dist+12]);
+    if(followMode) map.jumpTo({center:here});
     drive();
-    if (dist < totalM) anim = requestAnimationFrame(step);
-    else { $('etaBig').textContent='Arrived 🟠'; $('etaSub').textContent='you ate the whole route'; }
+    if(dist<totalM) anim=requestAnimationFrame(step);
+    else { $('etaBig').textContent='Arrived 🟡'; $('etaSub').textContent='you ate the whole route'; }
   };
-  setFollow(true);            // auto-follow when a drive starts
-  setTimeout(step, 700);
+  setFollow(true); setTimeout(step,700);
 }
 
-$('stop').onclick = () => {
-  cancelAnimationFrame(anim); setFollow(false);
-  $('eta').classList.remove('show');
-  map.getSource('pellets').setData(turf.featureCollection([]));
-  chomper && chomper.remove();
-};
+$('stop').onclick = () => { cancelAnimationFrame(anim); setFollow(false);
+  $('eta').classList.remove('show'); routeLine=null; pelletData=turf.featureCollection([]);
+  if(map.getSource('pellets')) map.getSource('pellets').setData(pelletData); chomper&&chomper.remove(); };
 
-// chomping-circle SVG (orange to match theme)
 function chomperSVG(){
   return `<svg viewBox="0 0 40 40" style="display:block;transition:transform .15s">
-    <path d="M20 20 L38 9 A20 20 0 1 0 38 31 Z" fill="#f26101" stroke="#8f3705" stroke-width="2"/>
-    <circle cx="22" cy="11" r="2.4" fill="#fff"/></svg>`;
+    <path d="M20 20 L38 9 A20 20 0 1 0 38 31 Z" fill="#ffc400" stroke="#7a5e00" stroke-width="2"/>
+    <circle cx="22" cy="11" r="2.4" fill="#1c1c1e"/></svg>`;
 }
 
-if (saved){ $('tokenGate').style.display='none'; initMap(saved); }
+if(saved){ $('tokenGate').style.display='none'; initMap(saved); }
 </script>
 </body>
 </html>
