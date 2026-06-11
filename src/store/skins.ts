@@ -156,6 +156,26 @@ export const SKINS: SkinListing[] = [
     frames: 1,
     frameSize: 256,
   },
+  {
+    id: 'sphere',
+    name: 'Sphere',
+    priceCents: 799,
+    ticketPrice: 650,
+    swatch: '#D4202A',
+    image: require('../../assets/character-sphere.png'),
+    frames: 1,
+    frameSize: 256,
+  },
+  {
+    id: 'crosshair',
+    name: 'Crosshair',
+    priceCents: 699,
+    ticketPrice: 600,
+    swatch: '#C07828',
+    image: require('../../assets/character-crosshair.png'),
+    frames: 1,
+    frameSize: 256,
+  },
 ];
 
 export const DEFAULT_SKIN_ID = 'classic';

@@ -213,8 +213,10 @@ insert into public.ticket_catalog(item_id, kind, price) values
   ('lime',    'skin', 200),
   ('oni',     'skin', 350),
   ('warpaint','skin', 300),
-  ('bronze',  'skin', 400),
-  ('noir',    'skin', 450),
-  ('klavan',  'skin', 600),
-  ('rouge',   'skin', 500)
+  ('bronze',     'skin', 400),
+  ('noir',       'skin', 450),
+  ('klavan',     'skin', 600),
+  ('rouge',      'skin', 500),
+  ('sphere',     'skin', 650),
+  ('crosshair',  'skin', 600)
 on conflict (item_id) do update set price = excluded.price, active = true;
