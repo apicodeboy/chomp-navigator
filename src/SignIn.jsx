@@ -1,11 +1,24 @@
 import { useState } from "react";
 import { supabase } from "./supabaseClient";
 
+// Read the email + "just signed up" flag passed from Sign Up via the query string.
+function getSignupParams() {
+  const p = new URLSearchParams(window.location.search);
+  return { email: p.get("email") || "", justSignedUp: p.get("signup") === "1" };
+}
+
 // Sign In — email/password via Supabase Auth.
 export default function SignIn() {
-  const [email, setEmail] = useState("");
+  const initial = getSignupParams();
+
+  const [email, setEmail] = useState(initial.email); // pre-filled if coming from signup
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [notice] = useState(
+    initial.justSignedUp
+      ? "Your account has been created. Please check your email and verify your address before logging in."
+      : ""
+  );
 
   async function handleSignIn(e) {
     e.preventDefault();
@@ -30,6 +43,9 @@ export default function SignIn() {
   return (
     <form onSubmit={handleSignIn}>
       <h1>Sign In</h1>
+
+      {/* success message shown above the form when arriving from signup */}
+      {notice && <p style={{ color: "green", fontSize: 13, marginBottom: 12 }}>{notice}</p>}
 
       <input
         type="email"
