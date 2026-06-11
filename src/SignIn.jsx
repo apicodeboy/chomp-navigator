@@ -11,10 +11,16 @@ export default function SignIn() {
     e.preventDefault();
     setError("");
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
       setError(error.message); // show Supabase error under the form
+      return;
+    }
+
+    // Only redirect when a real session actually exists.
+    if (!data.session) {
+      setError("Check your email and confirm your account before logging in.");
       return;
     }
 

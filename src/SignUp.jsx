@@ -6,19 +6,28 @@ export default function SignUp() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
 
   async function handleSignUp(e) {
     e.preventDefault();
     setError("");
+    setMessage("");
 
-    const { error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({ email, password });
 
     if (error) {
       setError(error.message); // show Supabase error under the form
       return;
     }
 
-    window.location.assign("/"); // success → redirect to Home
+    // With email confirmation on, signUp returns no session yet — don't redirect.
+    if (!data.session) {
+      setMessage("Check your email and confirm your account before logging in.");
+      return;
+    }
+
+    // Only redirect when a real session exists.
+    window.location.assign("/");
   }
 
   return (
@@ -43,8 +52,9 @@ export default function SignUp() {
 
       <button type="submit">Sign Up</button>
 
-      {/* small error message under the form */}
+      {/* small messages under the form */}
       {error && <p style={{ color: "red", fontSize: 13, marginTop: 8 }}>{error}</p>}
+      {message && <p style={{ color: "green", fontSize: 13, marginTop: 8 }}>{message}</p>}
     </form>
   );
 }
