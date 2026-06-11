@@ -40,6 +40,17 @@ export default function SignIn() {
     window.location.assign("/"); // success → redirect to Home
   }
 
+  // Google OAuth — Supabase opens the Google consent screen, then redirects back.
+  async function handleGoogle() {
+    setError("");
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: window.location.origin + "/" }, // return to Home after auth
+    });
+    if (error) setError(error.message);
+    // on success the browser navigates to Google; nothing else to do here.
+  }
+
   return (
     <form onSubmit={handleSignIn}>
       <h1>Sign In</h1>
@@ -64,6 +75,9 @@ export default function SignIn() {
       />
 
       <button type="submit">Sign In</button>
+
+      {/* OAuth — added because there was no existing Google button */}
+      <button type="button" onClick={handleGoogle}>Continue with Google</button>
 
       {/* small error message under the form */}
       {error && <p style={{ color: "red", fontSize: 13, marginTop: 8 }}>{error}</p>}
