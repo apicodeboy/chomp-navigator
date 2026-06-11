@@ -1,47 +1,49 @@
 /**
- * Central design tokens — light neumorphic theme with an orange accent.
- * Off-white surfaces, soft cards, vibrant orange primary, green "available/go"
- * status. Import `theme` anywhere instead of hardcoding colors.
+ * Central design tokens — dark map with a golden-yellow accent and white floating
+ * cards (the ride-app look). The map is dark; cards/sheets are white with dark text;
+ * yellow is used for button fills and the route. Import `theme` everywhere instead
+ * of hardcoding colors.
  */
 export const theme = {
   colors: {
-    /** Map base / app background. */
-    bg: '#ececec',
-    /** Panel / sheet surface. */
+    /** App / map background (dark). */
+    bg: '#15151a',
+    /** Floating card / sheet surface (white). */
     panel: '#ffffff',
-    /** Card / input surface. */
     card: '#ffffff',
-    /** Slightly recessed surface (tiles, muted chips). */
-    cardElevated: '#f4f4f4',
-    /** Hairline borders / dividers. */
-    border: '#e2e2e2',
+    /** Slightly recessed surface on white cards. */
+    cardElevated: '#f1f1f3',
+    /** Hairline dividers on white cards. */
+    border: '#ececec',
 
-    /** Primary accent (orange) + stronger variant + soft glow. */
-    accent: '#f26101',
-    accentStrong: '#d94f00',
-    accentGlow: 'rgba(242,97,1,0.30)',
+    /** Golden-yellow accent + a deeper amber + soft glow. */
+    accent: '#ffc400',
+    accentStrong: '#e6a700',
+    accentGlow: 'rgba(255,196,0,0.30)',
 
+    /** Text on white cards. */
     textPrimary: '#1c1c1e',
     textSecondary: '#8a8a8e',
     textMuted: '#b0b0b4',
+    /** Text placed directly over the dark map (no card behind it). */
+    textOnMap: '#ffffff',
 
-    /** "Available" / go status. */
     success: '#2ea96b',
     danger: '#ff3b30',
 
-    /** Text/icon color that sits on top of the orange accent. */
-    onAccent: '#ffffff',
+    /** Text/icon on top of the yellow accent (dark, for contrast). */
+    onAccent: '#1c1c1e',
 
-    /** The chomping character + pellets (orange to match the route theme). */
-    character: '#f26101',
-    characterOutline: '#8f3705',
+    /** The chomping character + pellets (yellow route). */
+    character: '#ffc400',
+    characterOutline: '#7a5e00',
 
-    /** Translucent light surface for overlays / cards sitting on the map. */
-    overlay: 'rgba(255,255,255,0.92)',
+    /** Translucent white card sitting on the dark map. */
+    overlay: 'rgba(255,255,255,0.96)',
   },
   radius: { pill: 999, lg: 22, md: 16, sm: 12 },
-  /** Light map style to match the theme. */
-  mapStyleUrl: 'mapbox://styles/mapbox/light-v11',
+  /** Dark map style to match the theme. */
+  mapStyleUrl: 'mapbox://styles/mapbox/dark-v11',
 } as const;
 
 export type Theme = typeof theme;

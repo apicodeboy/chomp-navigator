@@ -246,7 +246,7 @@ const card = {
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: theme.colors.bg },
-  msg: { color: theme.colors.textPrimary, textAlign: 'center', fontSize: 16 },
+  msg: { color: theme.colors.textOnMap, textAlign: 'center', fontSize: 16 },
 
   previewCard: { ...card, bottom: 24, gap: 6 },
   previewTitle: { color: theme.colors.textPrimary, fontSize: 18, fontWeight: '800' },

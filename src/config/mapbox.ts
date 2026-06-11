@@ -35,6 +35,6 @@ export const NAV = {
   FOLLOW_ZOOM: 17,
   /** Camera pitch (tilt) for a chase-cam feel. 0 = top-down. */
   FOLLOW_PITCH: 55,
-  /** Map style — light to match the orange neumorphic theme. */
-  STYLE_URL: 'mapbox://styles/mapbox/light-v11',
+  /** Map style — dark to match the yellow ride-app theme. */
+  STYLE_URL: 'mapbox://styles/mapbox/dark-v11',
 } as const;
