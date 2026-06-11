@@ -20,6 +20,8 @@ export interface SpendResult {
 interface TicketsStore {
   /** Server balance (null while loading / when backend not configured). */
   balance: number | null;
+  /** Lifetime distance navigated, meters (from server progress). */
+  progressMeters: number;
   /** Item ids the user owns (from server). */
   owned: Set<string>;
   /** Whether the Tickets backend is configured + reachable. */
@@ -39,18 +41,21 @@ const Ctx = createContext<TicketsStore | null>(null);
 
 export function TicketsProvider({ children }: { children: React.ReactNode }) {
   const [balance, setBalance] = useState<number | null>(null);
+  const [progressMeters, setProgressMeters] = useState(0);
   const [owned, setOwned] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(SUPABASE_ENABLED);
   const userId = useRef<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (!supabase || !userId.current) return;
-    const [{ data: bal }, { data: items }] = await Promise.all([
+    const [{ data: bal }, { data: items }, { data: prog }] = await Promise.all([
       supabase.from('ticket_balances').select('balance').maybeSingle(),
       supabase.from('owned_items').select('item_id'),
+      supabase.from('user_progress').select('total_meters').maybeSingle(),
     ]);
     setBalance(bal?.balance ?? 0);
     setOwned(new Set((items ?? []).map((r: { item_id: string }) => r.item_id)));
+    setProgressMeters(prog?.total_meters ?? 0);
   }, []);
 
   // Boot: anonymous auth, then load balance + items.
@@ -108,6 +113,7 @@ export function TicketsProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<TicketsStore>(
     () => ({
       balance,
+      progressMeters,
       owned,
       enabled: SUPABASE_ENABLED,
       loading,
@@ -117,7 +123,7 @@ export function TicketsProvider({ children }: { children: React.ReactNode }) {
       refresh,
       owns,
     }),
-    [balance, owned, loading, spend, reportDistance, buyBundle, refresh, owns],
+    [balance, progressMeters, owned, loading, spend, reportDistance, buyBundle, refresh, owns],
   );
 
   return React.createElement(Ctx.Provider, { value }, children);

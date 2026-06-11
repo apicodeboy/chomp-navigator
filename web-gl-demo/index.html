@@ -101,6 +101,15 @@
     font-weight:800;font-size:16px;cursor:pointer;display:flex;flex-direction:column;gap:4px;align-items:center;}
   .bundle small{color:#e6a700;font-weight:700;font-size:12px;}
   .disc{color:#999;font-size:11px;line-height:1.5;margin-top:18px;}
+  /* profile */
+  .pstats{display:flex;gap:26px;margin-top:16px;}
+  .pstats .s b{font-size:22px;display:block;}
+  .pstats .s span{color:#cfcfcf;font-size:12px;}
+  .reward{background:#faf7ef;border:1px solid #f0e6c8;border-radius:16px;padding:16px;}
+  .reward .rt{font-weight:800;font-size:15px;}
+  .reward .rs{color:#777;font-size:13px;margin-top:8px;}
+  .rbar{height:12px;background:#eee;border-radius:8px;overflow:hidden;margin:10px 0 4px;}
+  .rfill{height:100%;background:linear-gradient(90deg,#ffd34d,#ffc400);}
   @media(max-width:680px){ .store-body{grid-template-columns:1fr;} .filters{display:none;} .hero .puck{display:none;} .hero h1{font-size:24px;} }
 
   .token{position:fixed;inset:0;z-index:40;background:rgba(10,10,12,.95);display:flex;align-items:center;justify-content:center;padding:24px;}
@@ -124,7 +133,7 @@
   <button class="dot-btn" id="backBtn">‹</button>
   <div class="field"><span class="mag">🔍</span><input id="q" placeholder="Where to?" autocomplete="off" /><button class="go" id="go">Go</button></div>
   <button class="dot-btn" id="tixPill" style="width:auto;padding:0 13px;gap:5px;font-size:13px;font-weight:800;">🎟 <span id="tixCount">0</span></button>
-  <button class="dot-btn" id="bell">🔔</button>
+  <button class="dot-btn" id="profileBtn">👤</button>
 </div>
 <div class="results" id="results"></div>
 <div class="recents" id="recents"></div>
@@ -197,6 +206,26 @@
   </div>
 </div>
 
+<!-- Profile overlay -->
+<div class="store" id="profile">
+  <button class="store-close" id="profileClose">✕</button>
+  <div class="store-wrap">
+    <div class="hero" style="background:#1c1c22;color:#fff;">
+      <div>
+        <h1>Your Profile</h1>
+        <p style="color:#bbb;">Drive to earn Tickets, then spend them on characters. Tickets have no cash value.</p>
+        <div class="pstats" id="pstats"></div>
+      </div>
+      <div class="puck" id="pavatar"></div>
+    </div>
+    <h2 style="margin:24px 4px 6px;font-size:18px;">Rewards</h2>
+    <div class="reward" id="reward"></div>
+    <h2 style="margin:24px 4px 12px;font-size:18px;">Your Characters (<span id="ownCount">0</span>)</h2>
+    <div class="grid" id="ownedGrid"></div>
+    <p class="disc" id="pdisc"></p>
+  </div>
+</div>
+
 <div class="token" id="tokenGate">
   <div class="box">
     <h2>🟡 Chomp Navigator — live API demo</h2>
@@ -224,8 +253,8 @@ const SKINS=[
   {id:'coral',   name:'Coral',    body:'#ff6e6e',outline:'#962828',tprice:200,stars:5},
   {id:'sky',     name:'Sky',      body:'#7cc4ff',outline:'#2b6ca3',tprice:150,stars:4},
   {id:'lime',    name:'Lime',     body:'#b6e000',outline:'#5d7400',tprice:200,stars:5},
-  {id:'oni',     name:'Red Oni',  body:'#d4202a',outline:'#5e0a0f',tprice:350,stars:5},
-  {id:'warpaint',name:'War Paint',body:'#e0a44e',outline:'#8a4b12',tprice:300,stars:4},
+  {id:'oni',     name:'Red Oni',  body:'#d4202a',outline:'#5e0a0f',tprice:350,stars:5, art:'oni',      img:'assets/oni.png'},
+  {id:'warpaint',name:'War Paint',body:'#e0a44e',outline:'#8a4b12',tprice:300,stars:4, art:'warpaint', img:'assets/warpaint.png'},
 ];
 let equippedId='classic';
 
@@ -323,7 +352,7 @@ function updateChomper(){
   const ahead=turf.along(routeLine,Math.min(dist+10,totalM)/1000).geometry.coordinates;
   chomper.setLngLat(here);
   // chompers rotate to face travel; full-art characters stay upright
-  if(!skin.img) chomper.getElement().firstChild.style.transform=`rotate(${turf.bearing(turf.point(here),turf.point(ahead))}deg)`;
+  if(!skin.img && !skin.art) chomper.getElement().firstChild.style.transform=`rotate(${turf.bearing(turf.point(here),turf.point(ahead))}deg)`;
   map.setFilter('pellets',['>',['get','d'],dist+12]);
   if(followMode) map.jumpTo({center:here});
   const remain=Math.max(totalM-dist,0); const sec=routeDuration*(remain/Math.max(routeDist,1));
@@ -389,14 +418,49 @@ $('stop').onclick=()=>{ setFollow(false); $('eta').classList.remove('show'); rou
 function chomperSVG(){ return `<svg viewBox="0 0 40 40" style="display:block;transition:transform .15s">
   <path d="M20 20 L38 9 A20 20 0 1 0 38 31 Z" fill="${skin.body}" stroke="${skin.outline}" stroke-width="2"/>
   <circle cx="22" cy="11" r="2.4" fill="#1c1c1e"/></svg>`; }
-// Marker content: full-art skins render as an upright image; chompers as the SVG.
-function markerHTML(){ return skin.img
-  ? `<img src="${skin.img}" style="width:48px;height:48px;object-fit:contain;display:block;filter:drop-shadow(0 3px 5px rgba(0,0,0,.5))">`
-  : chomperSVG(); }
-function previewSVG(s){ if(s.img) return `<img src="${s.img}" style="width:96px;height:96px;object-fit:contain">`;
+
+// Hand-built character art for Red Oni + War Paint (stylized stand-ins for the
+// real renders). If a real PNG (assets/<id>.png) is present it is used instead;
+// otherwise the <img> onerror swaps in this SVG.
+function artSVG(id){
+  if(id==='oni') return `<svg viewBox="0 0 100 100" width="100%" height="100%">
+    <defs><radialGradient id="og" cx="50%" cy="40%" r="62%"><stop offset="0%" stop-color="#ff4d4d"/><stop offset="100%" stop-color="#6e0000"/></radialGradient></defs>
+    <circle cx="50" cy="50" r="48" fill="url(#og)" stroke="#ffb3b3" stroke-width="1.5"/>
+    <polygon points="50,8 56,26 70,16 64,33 82,30 68,42 84,52 66,52 74,68 58,58 56,76 48,60 38,74 38,56 22,64 32,48 16,46 32,40 24,24 40,32 44,14" fill="#a8000f"/>
+    <circle cx="50" cy="48" r="21" fill="#d4202a"/>
+    <ellipse cx="44" cy="50" rx="3.6" ry="2.7" fill="#ffd24d"/><ellipse cx="56" cy="50" rx="3.6" ry="2.7" fill="#ffd24d"/>
+    <circle cx="44.5" cy="50.5" r="1.3" fill="#1a0000"/><circle cx="56.5" cy="50.5" r="1.3" fill="#1a0000"/>
+    <path d="M46 41 l4 -5 4 5 -4 3 z" fill="#2a0000"/>
+    <rect x="42" y="58" width="16" height="20" rx="2" fill="#4caf1f"/><rect x="42" y="58" width="16" height="6" fill="#bfe3a0" opacity=".7"/>
+  </svg>`;
+  if(id==='warpaint') return `<svg viewBox="0 0 100 100" width="100%" height="100%">
+    <defs><radialGradient id="wg" cx="50%" cy="45%" r="62%"><stop offset="0%" stop-color="#e8c07a"/><stop offset="100%" stop-color="#9c6a2a"/></radialGradient></defs>
+    <ellipse cx="50" cy="52" rx="33" ry="41" fill="url(#wg)"/>
+    <path d="M20 30 q30 -22 60 0 q-6 -27 -30 -27 q-24 0 -30 27z" fill="#2a1a0a"/>
+    <circle cx="50" cy="34" r="9" fill="none" stroke="#e22" stroke-width="2.4"/>
+    <line x1="50" y1="20" x2="50" y2="48" stroke="#e22" stroke-width="2.4"/><line x1="36" y1="34" x2="64" y2="34" stroke="#e22" stroke-width="2.4"/>
+    <ellipse cx="40" cy="55" rx="8" ry="5" fill="#fff" stroke="#111" stroke-width="2.5"/><ellipse cx="60" cy="55" rx="8" ry="5" fill="#fff" stroke="#111" stroke-width="2.5"/>
+    <circle cx="40" cy="55" r="2" fill="#111"/><circle cx="60" cy="55" r="2" fill="#111"/>
+    <path d="M40 71 q10 8 20 0" stroke="#111" stroke-width="2.5" fill="none"/>
+    <circle cx="67" cy="64" r="5" fill="none" stroke="#e22" stroke-width="1.8"/>
+  </svg>`;
+  return '';
+}
+// real PNG if present, else the SVG art (onerror fallback)
+function artImgOrSvg(s,px){ return `<img src="${s.img}" style="width:${px}px;height:${px}px;object-fit:contain;display:block;filter:drop-shadow(0 3px 5px rgba(0,0,0,.45))" onerror="this.onerror=null;this.outerHTML='<div style=&quot;width:${px}px;height:${px}px&quot;>'+decodeURIComponent('${encodeURIComponent(artSVG(s.art))}')+'</div>'">`; }
+
+function markerHTML(){
+  if(skin.art) return artImgOrSvg(skin,48);
+  if(skin.img) return `<img src="${skin.img}" style="width:48px;height:48px;object-fit:contain;display:block">`;
+  return chomperSVG();
+}
+function previewSVG(s){
+  if(s.art) return artImgOrSvg(s,96);
+  if(s.img) return `<img src="${s.img}" style="width:96px;height:96px;object-fit:contain">`;
   return `<svg viewBox="0 0 100 100" width="96" height="96">
   <path d="M50 50 L96 26 A50 50 0 1 0 96 74 Z" fill="${s.body}" stroke="${s.outline}" stroke-width="4"/>
-  <circle cx="56" cy="28" r="6" fill="#1c1c1e"/></svg>`; }
+  <circle cx="56" cy="28" r="6" fill="#1c1c1e"/></svg>`;
+}
 function ownsSkin(s){ return s.tprice===0 || ownedSkins.has(s.id); }
 function priceLabel(s){ return s.tprice===0?'Free':`🎟 ${s.tprice}`; }
 function btnLabel(s){ return equippedId===s.id?'Equipped':ownsSkin(s)?'Equip':`Buy 🎟 ${s.tprice}`; }
@@ -436,6 +500,27 @@ $('storeBtn').onclick=()=>{ renderStore(); $('store').classList.add('show'); };
 $('tixPill').onclick=()=>{ renderStore(); $('store').classList.add('show'); };
 $('storeClose').onclick=()=>$('store').classList.remove('show');
 updateTixUI();
+
+// ---- Profile: owned characters + miles traveled + reward progress ----
+function renderProfile(){
+  const miles=lifetimeM/1609.34;
+  const ownedList=SKINS.filter(s=>ownsSkin(s));
+  $('pstats').innerHTML=`
+    <div class="s"><b>${miles.toFixed(1)}</b><span>miles driven</span></div>
+    <div class="s"><b>${ownedList.length}</b><span>characters</span></div>
+    <div class="s"><b>🎟 ${tickets}</b><span>tickets</span></div>`;
+  const eq=SKINS.find(s=>s.id===equippedId)||SKINS[0];
+  $('pavatar').innerHTML=`<div style="width:96px;height:96px">${previewSVG(eq)}</div>`;
+  const stepMi=MS_STEP/1609.34, into=miles%stepMi, pct=Math.min(100,into/stepMi*100), remain=stepMi-into;
+  $('reward').innerHTML=`<div class="rt">Next reward: 🎟 ${MS_REWARD} free</div>
+    <div class="rbar"><div class="rfill" style="width:${pct.toFixed(0)}%"></div></div>
+    <div class="rs">Drive ${remain.toFixed(1)} more mi to earn 🎟 ${MS_REWARD}. Earned so far: 🎟 ${creditedMs*MS_REWARD} across ${creditedMs} milestone${creditedMs===1?'':'s'}.</div>`;
+  $('ownCount').textContent=ownedList.length;
+  $('ownedGrid').innerHTML=ownedList.map(s=>`<div class="pcard"><div class="img">${previewSVG(s)}</div><h3>${s.name}</h3>${equippedId===s.id?'<div class="stars">Equipped</div>':''}</div>`).join('');
+  $('pdisc').textContent=DISCLAIMER;
+}
+$('profileBtn').onclick=()=>{ renderProfile(); $('profile').classList.add('show'); };
+$('profileClose').onclick=()=>$('profile').classList.remove('show');
 
 if(saved){ $('tokenGate').style.display='none'; initMap(saved); }
 renderRecents();   // show recent destinations under the search bar

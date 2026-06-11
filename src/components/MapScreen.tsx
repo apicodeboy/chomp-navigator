@@ -19,6 +19,7 @@ import InstructionBanner from './InstructionBanner';
 import EtaBar from './EtaBar';
 import SearchPanel from './SearchPanel';
 import StoreScreen from './StoreScreen';
+import ProfileScreen from './ProfileScreen';
 import TicketBalance from './TicketBalance';
 import { useSkinStore } from '@/store/useSkinStore';
 import { useTickets } from '@/store/useTickets';
@@ -43,6 +44,7 @@ export default function MapScreen() {
   const [place, setPlace] = useState<Place | null>(null);
   const [started, setStarted] = useState(false);
   const [storeOpen, setStoreOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [voiceOn, setVoiceOn] = useState(true);
 
   const { route, pellets, progress, status, error, reset } = useNavigation(
@@ -236,6 +238,9 @@ export default function MapScreen() {
       <TouchableOpacity style={styles.fab} onPress={() => setStoreOpen(true)}>
         <Text style={styles.fabIcon}>🛒</Text>
       </TouchableOpacity>
+      <TouchableOpacity style={[styles.fab, styles.fabProfile]} onPress={() => setProfileOpen(true)}>
+        <Text style={styles.fabIcon}>👤</Text>
+      </TouchableOpacity>
       {isNav && (
         <>
           <TouchableOpacity
@@ -254,6 +259,7 @@ export default function MapScreen() {
       )}
 
       <StoreScreen visible={storeOpen} onClose={() => setStoreOpen(false)} />
+      <ProfileScreen visible={profileOpen} onClose={() => setProfileOpen(false)} />
       {error && <Text style={styles.error}>{error}</Text>}
     </View>
   );
@@ -301,8 +307,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  fabMute: { bottom: 224 },
-  fabRecenter: { bottom: 167 },
+  fabProfile: { bottom: 167 },
+  fabRecenter: { bottom: 224 },
+  fabMute: { bottom: 281 },
   fabIcon: { fontSize: 24 },
   ticketTop: { position: 'absolute', top: 116, right: 12 },
 
