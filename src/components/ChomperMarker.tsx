@@ -9,12 +9,17 @@ import type { Position } from 'geojson';
  * `sheet` with your own ORIGINAL sprite art (no trademarked characters).
  */
 export interface ChomperSkin {
-  /** require(...) of a horizontal sprite sheet PNG. */
-  sheet: ReturnType<typeof require>;
+  /** require(...) of a horizontal sprite sheet PNG (animated chomper skins). */
+  sheet?: ReturnType<typeof require>;
   /** Number of frames in the sheet. */
   frames: number;
   /** Source frame size in px (assumes square frames laid out horizontally). */
   frameSize: number;
+  /**
+   * Optional full-art image (require(...)). When set, the marker renders this
+   * static artwork instead of the animated sprite sheet (no chomp animation).
+   */
+  image?: ReturnType<typeof require>;
 }
 
 /** Default placeholder skin. ⬅️ Swap `chomper.png` for your own art before shipping. */
@@ -55,12 +60,24 @@ export function ChomperSprite({
 }) {
   const [frame, setFrame] = useState(0);
   useEffect(() => {
+    if (skin.image) return; // full-art skins don't animate
     const id = setInterval(
       () => setFrame((f) => (f + 1) % skin.frames),
       1000 / fps,
     );
     return () => clearInterval(id);
-  }, [skin.frames, fps]);
+  }, [skin.frames, fps, skin.image]);
+
+  // Full-art character: render the static image upright.
+  if (skin.image) {
+    return (
+      <Image
+        source={skin.image}
+        style={{ width: size, height: size }}
+        resizeMode="contain"
+      />
+    );
+  }
 
   return (
     // Clip to one frame; shift the wide sheet left to reveal the current frame.

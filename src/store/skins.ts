@@ -115,6 +115,47 @@ export const SKINS: SkinListing[] = [
     frames: 6,
     frameSize: 128,
   },
+  // Full-art characters (static image skins).
+  {
+    id: 'bronze',
+    name: 'Bronze',
+    priceCents: 499,
+    ticketPrice: 400,
+    swatch: '#b5743a',
+    image: require('../../assets/character-bronze.png'),
+    frames: 1,
+    frameSize: 256,
+  },
+  {
+    id: 'noir',
+    name: 'Noir',
+    priceCents: 599,
+    ticketPrice: 450,
+    swatch: '#2b2b2e',
+    image: require('../../assets/character-noir.png'),
+    frames: 1,
+    frameSize: 256,
+  },
+  {
+    id: 'klavan',
+    name: 'Klavan',
+    priceCents: 699,
+    ticketPrice: 600,
+    swatch: '#f2d23a',
+    image: require('../../assets/character-klavan.png'),
+    frames: 1,
+    frameSize: 256,
+  },
+  {
+    id: 'rouge',
+    name: 'Rouge',
+    priceCents: 599,
+    ticketPrice: 500,
+    swatch: '#d23a3a',
+    image: require('../../assets/character-rouge.png'),
+    frames: 1,
+    frameSize: 256,
+  },
 ];
 
 export const DEFAULT_SKIN_ID = 'classic';
