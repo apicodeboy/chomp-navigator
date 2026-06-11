@@ -101,9 +101,9 @@ export const SKINS: SkinListing[] = [
     priceCents: 499,
     ticketPrice: 350,
     swatch: '#D4202A',
-    sheet: require('../../assets/chomper-oni.png'),
-    frames: 6,
-    frameSize: 128,
+    image: require('../../assets/character-oni.png'),
+    frames: 1,
+    frameSize: 256,
   },
   {
     id: 'warpaint',
@@ -111,9 +111,9 @@ export const SKINS: SkinListing[] = [
     priceCents: 399,
     ticketPrice: 300,
     swatch: '#E0A44E',
-    sheet: require('../../assets/chomper-warpaint.png'),
-    frames: 6,
-    frameSize: 128,
+    image: require('../../assets/character-warpaint.png'),
+    frames: 1,
+    frameSize: 256,
   },
 ];
 
