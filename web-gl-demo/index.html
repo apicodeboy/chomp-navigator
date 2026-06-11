@@ -226,6 +226,11 @@ const SKINS=[
   {id:'lime',    name:'Lime',     body:'#b6e000',outline:'#5d7400',tprice:200,stars:5},
   {id:'oni',     name:'Red Oni',  body:'#d4202a',outline:'#5e0a0f',tprice:350,stars:5},
   {id:'warpaint',name:'War Paint',body:'#e0a44e',outline:'#8a4b12',tprice:300,stars:4},
+  // Real character artwork (full-art skins)
+  {id:'bronze',  name:'Bronze',  img:'assets/bronze.png', tprice:400,stars:5},
+  {id:'noir',    name:'Noir',    img:'assets/noir.png',   tprice:450,stars:5},
+  {id:'klavan',  name:'Klavan',  img:'assets/klavan.png', tprice:600,stars:5},
+  {id:'rouge',   name:'Rouge',   img:'assets/rouge.png',  tprice:500,stars:4},
 ];
 let equippedId='classic';
 
@@ -291,7 +296,7 @@ function initMap(token){
   map.on('dragstart',()=>setFollow(false));
   map.on('style.load',ensureLayers);
   map.on('load',()=>{
-    const el=document.createElement('div'); el.className='chomp'; el.innerHTML=chomperSVG(); chomper=new mapboxgl.Marker({element:el});
+    const el=document.createElement('div'); el.className='chomp'; el.innerHTML=markerHTML(); chomper=new mapboxgl.Marker({element:el});
     // REAL GPS: continuously track the device's true position
     if(navigator.geolocation){
       geoWatch=navigator.geolocation.watchPosition(onPos,()=>showHint('Location blocked — allow location to move the character.'),{enableHighAccuracy:true,maximumAge:1000,timeout:15000});
@@ -322,7 +327,8 @@ function updateChomper(){
   const here=snap.geometry.coordinates;
   const ahead=turf.along(routeLine,Math.min(dist+10,totalM)/1000).geometry.coordinates;
   chomper.setLngLat(here);
-  chomper.getElement().firstChild.style.transform=`rotate(${turf.bearing(turf.point(here),turf.point(ahead))}deg)`;
+  // chompers rotate to face travel; full-art characters stay upright
+  if(!skin.img) chomper.getElement().firstChild.style.transform=`rotate(${turf.bearing(turf.point(here),turf.point(ahead))}deg)`;
   map.setFilter('pellets',['>',['get','d'],dist+12]);
   if(followMode) map.jumpTo({center:here});
   const remain=Math.max(totalM-dist,0); const sec=routeDuration*(remain/Math.max(routeDist,1));
@@ -388,7 +394,12 @@ $('stop').onclick=()=>{ setFollow(false); $('eta').classList.remove('show'); rou
 function chomperSVG(){ return `<svg viewBox="0 0 40 40" style="display:block;transition:transform .15s">
   <path d="M20 20 L38 9 A20 20 0 1 0 38 31 Z" fill="${skin.body}" stroke="${skin.outline}" stroke-width="2"/>
   <circle cx="22" cy="11" r="2.4" fill="#1c1c1e"/></svg>`; }
-function previewSVG(s){ return `<svg viewBox="0 0 100 100" width="96" height="96">
+// Marker content: full-art skins render as an upright image; chompers as the SVG.
+function markerHTML(){ return skin.img
+  ? `<img src="${skin.img}" style="width:48px;height:48px;object-fit:contain;display:block;filter:drop-shadow(0 3px 5px rgba(0,0,0,.5))">`
+  : chomperSVG(); }
+function previewSVG(s){ if(s.img) return `<img src="${s.img}" style="width:96px;height:96px;object-fit:contain">`;
+  return `<svg viewBox="0 0 100 100" width="96" height="96">
   <path d="M50 50 L96 26 A50 50 0 1 0 96 74 Z" fill="${s.body}" stroke="${s.outline}" stroke-width="4"/>
   <circle cx="56" cy="28" r="6" fill="#1c1c1e"/></svg>`; }
 function ownsSkin(s){ return s.tprice===0 || ownedSkins.has(s.id); }
@@ -417,8 +428,8 @@ function buyOrEquip(id){
   equip(s);
 }
 function equip(s){
-  equippedId=s.id; skin={body:s.body,outline:s.outline};
-  if(chomper) chomper.getElement().innerHTML=chomperSVG();
+  equippedId=s.id; skin=s;
+  if(chomper) chomper.getElement().innerHTML=markerHTML();
   renderStore(); $('store').classList.remove('show');
   showHint(`${s.name} equipped — it's now your route muncher.`);
 }
