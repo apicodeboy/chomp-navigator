@@ -92,6 +92,15 @@
   .addcart.equipped{background:var(--accent);border-color:var(--accent);color:#1c1c1e;}
   .store-close{position:sticky;top:10px;float:right;margin:6px;width:44px;height:44px;border-radius:50%;border:0;
     background:#1c1c1e;color:#fff;font-size:18px;cursor:pointer;z-index:2;}
+  .bal{background:#fff7da;color:#7a5e00;border:1px solid #ffe89c;border-radius:20px;padding:8px 14px;font-weight:800;font-size:14px;}
+  .getix{margin-top:28px;border-top:1px solid #eee;padding-top:20px;}
+  .getix h2{font-size:18px;font-weight:800;}
+  .getix p{color:#777;font-size:13px;margin-top:4px;}
+  .bundles{display:flex;gap:12px;margin-top:14px;flex-wrap:wrap;}
+  .bundle{flex:1;min-width:120px;background:#fafafa;border:1px solid #eee;border-radius:14px;padding:16px;
+    font-weight:800;font-size:16px;cursor:pointer;display:flex;flex-direction:column;gap:4px;align-items:center;}
+  .bundle small{color:#e6a700;font-weight:700;font-size:12px;}
+  .disc{color:#999;font-size:11px;line-height:1.5;margin-top:18px;}
   @media(max-width:680px){ .store-body{grid-template-columns:1fr;} .filters{display:none;} .hero .puck{display:none;} .hero h1{font-size:24px;} }
 
   .token{position:fixed;inset:0;z-index:40;background:rgba(10,10,12,.95);display:flex;align-items:center;justify-content:center;padding:24px;}
@@ -114,6 +123,7 @@
 <div class="top">
   <button class="dot-btn" id="backBtn">‹</button>
   <div class="field"><span class="mag">🔍</span><input id="q" placeholder="Where to?" autocomplete="off" /><button class="go" id="go">Go</button></div>
+  <button class="dot-btn" id="tixPill" style="width:auto;padding:0 13px;gap:5px;font-size:13px;font-weight:800;">🎟 <span id="tixCount">0</span></button>
   <button class="dot-btn" id="bell">🔔</button>
 </div>
 <div class="results" id="results"></div>
@@ -156,19 +166,33 @@
       <div><h1>Chomp Characters</h1><p>Unlock new characters to eat your way to your destination. Every skin changes the muncher that follows your real route.</p></div>
       <div class="puck">🟡</div>
     </div>
-    <div class="store-head"><b id="count">Showing 6 Characters</b><div class="sortby">Sort by: Recommended ▾</div></div>
+    <div class="store-head">
+      <b id="count">Showing 8 Characters</b>
+      <div class="bal">🎟 <span id="storeBal">0</span> Tickets</div>
+    </div>
     <div class="store-body">
       <aside class="filters">
         <div class="fbox"><h4>Rarity ▾</h4>
-          <label><input type="checkbox" checked> Common <span class="n">3</span></label>
+          <label><input type="checkbox" checked> Common <span class="n">4</span></label>
           <label><input type="checkbox"> Rare <span class="n">2</span></label>
-          <label><input type="checkbox"> Legendary <span class="n">1</span></label></div>
+          <label><input type="checkbox"> Legendary <span class="n">2</span></label></div>
         <div class="fbox"><h4>Price ▾</h4>
           <label><input type="checkbox"> Free <span class="n">1</span></label>
-          <label><input type="checkbox"> $0 – $2 <span class="n">3</span></label>
-          <label><input type="checkbox"> $2 – $5 <span class="n">2</span></label></div>
+          <label><input type="checkbox"> 🎟 ≤200 <span class="n">5</span></label>
+          <label><input type="checkbox"> 🎟 300+ <span class="n">2</span></label></div>
       </aside>
       <div class="grid" id="skinGrid"></div>
+    </div>
+
+    <div class="getix">
+      <h2>Get Tickets</h2>
+      <p>Earn 🎟 50 free for every ~50 mi you actually navigate — or top up (demo):</p>
+      <div class="bundles">
+        <button class="bundle" data-t="200">🎟 200<small>$1.99</small></button>
+        <button class="bundle" data-t="600">🎟 600<small>$4.99</small></button>
+        <button class="bundle" data-t="1500">🎟 1,500<small>$9.99</small></button>
+      </div>
+      <p class="disc" id="disc"></p>
     </div>
   </div>
 </div>
@@ -194,14 +218,37 @@ const STYLES=['mapbox://styles/mapbox/dark-v11','mapbox://styles/mapbox/standard
 let styleIdx=0;
 
 const SKINS=[
-  {id:'classic',name:'Classic',body:'#ffc400',outline:'#7a5e00',price:'Free',stars:5},
-  {id:'mint',   name:'Minty',  body:'#50e0b4',outline:'#147860',price:'$1.99',stars:5},
-  {id:'grape',  name:'Grape',  body:'#b478ff',outline:'#603096',price:'$1.99',stars:4},
-  {id:'coral',  name:'Coral',  body:'#ff6e6e',outline:'#962828',price:'$2.99',stars:5},
-  {id:'sky',    name:'Sky',    body:'#7cc4ff',outline:'#2b6ca3',price:'$1.99',stars:4},
-  {id:'lime',   name:'Lime',   body:'#b6e000',outline:'#5d7400',price:'$2.99',stars:5},
+  {id:'classic', name:'Classic',  body:'#ffc400',outline:'#7a5e00',tprice:0,  stars:5},
+  {id:'mint',    name:'Minty',    body:'#50e0b4',outline:'#147860',tprice:150,stars:5},
+  {id:'grape',   name:'Grape',    body:'#b478ff',outline:'#603096',tprice:150,stars:4},
+  {id:'coral',   name:'Coral',    body:'#ff6e6e',outline:'#962828',tprice:200,stars:5},
+  {id:'sky',     name:'Sky',      body:'#7cc4ff',outline:'#2b6ca3',tprice:150,stars:4},
+  {id:'lime',    name:'Lime',     body:'#b6e000',outline:'#5d7400',tprice:200,stars:5},
+  {id:'oni',     name:'Red Oni',  body:'#d4202a',outline:'#5e0a0f',tprice:350,stars:5},
+  {id:'warpaint',name:'War Paint',body:'#e0a44e',outline:'#8a4b12',tprice:300,stars:4},
 ];
 let equippedId='classic';
+
+// ---- Tickets (LOCAL DEMO only — the secure server-authoritative version lives
+// in the React Native app + Supabase. Tickets have no cash value.) ----
+const DISCLAIMER='Tickets are a virtual in-app currency with no real-world monetary value. They cannot be cashed out, withdrawn, sold, transferred, or exchanged for money or prizes.';
+let tickets=+(localStorage.getItem('tickets')||0);
+let ownedSkins=new Set(JSON.parse(localStorage.getItem('ownedSkins')||'["classic"]'));
+let lifetimeM=+(localStorage.getItem('lifetimeM')||0);
+let creditedMs=+(localStorage.getItem('creditedMs')||0);
+let arrivedCredited=false;
+const MS_STEP=80467, MS_REWARD=50;
+function saveTix(){ localStorage.setItem('tickets',tickets); localStorage.setItem('ownedSkins',JSON.stringify([...ownedSkins]));
+  localStorage.setItem('lifetimeM',lifetimeM); localStorage.setItem('creditedMs',creditedMs); updateTixUI(); }
+function updateTixUI(){ const c=document.getElementById('tixCount'); if(c) c.textContent=tickets;
+  const b=document.getElementById('storeBal'); if(b) b.textContent=tickets; }
+// earn on arrival: add trip distance, credit any newly crossed milestone
+function earnOnArrival(tripM){
+  lifetimeM+=tripM; const ms=Math.floor(lifetimeM/MS_STEP);
+  if(ms>creditedMs){ const gained=(ms-creditedMs)*MS_REWARD; tickets+=gained; creditedMs=ms; saveTix();
+    showHint(`🎟 +${gained} Tickets earned for the distance you drove!`); }
+  else saveTix();
+}
 let recents=JSON.parse(localStorage.getItem('recents')||'[]');
 
 // minutes → "X min" or "1 h 23 min" for longer trips
@@ -279,7 +326,8 @@ function updateChomper(){
   map.setFilter('pellets',['>',['get','d'],dist+12]);
   if(followMode) map.jumpTo({center:here});
   const remain=Math.max(totalM-dist,0); const sec=routeDuration*(remain/Math.max(routeDist,1));
-  if(remain<15){ $('etaBig').textContent='Arrived 🟡'; $('etaSub').textContent='you ate the whole route'; }
+  if(remain<15){ $('etaBig').textContent='Arrived 🟡'; $('etaSub').textContent='you ate the whole route';
+    if(!arrivedCredited){ arrivedCredited=true; earnOnArrival(totalM); } }
   else $('etaBig').textContent=`${fmtMins(sec)} · ${(remain/1000).toFixed(1)} km`;
 }
 
@@ -322,6 +370,7 @@ async function startRoute(dest,name){
   totalM=turf.length(routeLine,{units:'meters'}); routeDuration=route.duration; routeDist=route.distance; dist=0;
   const pellets=[]; for(let d=0;d<=totalM;d+=25) pellets.push(turf.point(turf.along(routeLine,d/1000).geometry.coordinates,{d}));
   pelletData=turf.featureCollection(pellets); map.getSource('pellets').setData(pelletData);
+  arrivedCredited=false;
   $('eta').classList.add('show');
   chomper.setLngLat(userLngLat).addTo(map);
   const bb=turf.bbox(routeLine); map.fitBounds([[bb[0],bb[1]],[bb[2],bb[3]]],{padding:70,pitch:0});
@@ -342,30 +391,45 @@ function chomperSVG(){ return `<svg viewBox="0 0 40 40" style="display:block;tra
 function previewSVG(s){ return `<svg viewBox="0 0 100 100" width="96" height="96">
   <path d="M50 50 L96 26 A50 50 0 1 0 96 74 Z" fill="${s.body}" stroke="${s.outline}" stroke-width="4"/>
   <circle cx="56" cy="28" r="6" fill="#1c1c1e"/></svg>`; }
+function ownsSkin(s){ return s.tprice===0 || ownedSkins.has(s.id); }
+function priceLabel(s){ return s.tprice===0?'Free':`🎟 ${s.tprice}`; }
+function btnLabel(s){ return equippedId===s.id?'Equipped':ownsSkin(s)?'Equip':`Buy 🎟 ${s.tprice}`; }
 function renderStore(){
   $('count').textContent=`Showing ${SKINS.length} Characters`;
+  $('disc').textContent=DISCLAIMER+' This web build is a local demo; the secure, server-authoritative Tickets system runs in the app.';
+  updateTixUI();
   $('skinGrid').innerHTML=SKINS.map(s=>`
     <div class="pcard">
       <div class="heart">♡</div>
       <div class="img">${previewSVG(s)}</div>
       <h3>${s.name}</h3>
       <div class="stars">${'★'.repeat(s.stars)}${'☆'.repeat(5-s.stars)}</div>
-      <div class="price">${s.price}</div>
-      <button class="addcart ${equippedId===s.id?'equipped':''}" data-id="${s.id}">
-        ${equippedId===s.id?'Equipped':'Add to Cart'}</button>
+      <div class="price">${priceLabel(s)}</div>
+      <button class="addcart ${equippedId===s.id?'equipped':''}" data-id="${s.id}">${btnLabel(s)}</button>
     </div>`).join('');
-  document.querySelectorAll('.addcart').forEach(b=>b.onclick=()=>equip(b.dataset.id));
+  document.querySelectorAll('.addcart').forEach(b=>b.onclick=()=>buyOrEquip(b.dataset.id));
 }
-function equip(id){
-  const s=SKINS.find(x=>x.id===id); if(!s) return;
-  equippedId=id; skin={body:s.body,outline:s.outline};
+function buyOrEquip(id){
+  const s=SKINS.find(x=>x.id===id); if(!s||equippedId===id) return;
+  if(ownsSkin(s)){ equip(s); return; }
+  if(tickets < s.tprice){ showHint(`Not enough Tickets — you need 🎟 ${s.tprice}. Drive to earn, or top up.`); return; }
+  tickets-=s.tprice; ownedSkins.add(s.id); saveTix();   // spend
+  equip(s);
+}
+function equip(s){
+  equippedId=s.id; skin={body:s.body,outline:s.outline};
   if(chomper) chomper.getElement().innerHTML=chomperSVG();
-  renderStore();
-  $('store').classList.remove('show');
+  renderStore(); $('store').classList.remove('show');
   showHint(`${s.name} equipped — it's now your route muncher.`);
 }
+document.querySelectorAll('.bundle').forEach(b=>b.onclick=()=>{
+  tickets+=parseInt(b.dataset.t,10); saveTix();
+  showHint(`🎟 +${b.dataset.t} Tickets added (demo top-up).`);
+});
 $('storeBtn').onclick=()=>{ renderStore(); $('store').classList.add('show'); };
+$('tixPill').onclick=()=>{ renderStore(); $('store').classList.add('show'); };
 $('storeClose').onclick=()=>$('store').classList.remove('show');
+updateTixUI();
 
 if(saved){ $('tokenGate').style.display='none'; initMap(saved); }
 renderRecents();   // show recent destinations under the search bar

@@ -3,6 +3,7 @@ import { SafeAreaView, StyleSheet } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import MapScreen from '@/components/MapScreen';
 import { SkinStoreProvider } from '@/store/useSkinStore';
+import { TicketsProvider } from '@/store/useTickets';
 import { theme } from '@/theme';
 
 /**
@@ -11,12 +12,14 @@ import { theme } from '@/theme';
  */
 export default function App() {
   return (
-    <SkinStoreProvider>
-      <SafeAreaView style={styles.fill}>
-        <StatusBar style="light" />
-        <MapScreen />
-      </SafeAreaView>
-    </SkinStoreProvider>
+    <TicketsProvider>
+      <SkinStoreProvider>
+        <SafeAreaView style={styles.fill}>
+          <StatusBar style="light" />
+          <MapScreen />
+        </SafeAreaView>
+      </SkinStoreProvider>
+    </TicketsProvider>
   );
 }
 

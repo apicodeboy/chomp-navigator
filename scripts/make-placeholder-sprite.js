@@ -25,6 +25,10 @@ const SKINS = [
   ['chomper-mint', [80, 224, 180], [20, 120, 96]], // mint
   ['chomper-grape', [180, 120, 255], [96, 48, 150]], // grape
   ['chomper-coral', [255, 110, 110], [150, 40, 40]], // coral
+  ['chomper-sky', [124, 196, 255], [43, 108, 163]], // sky
+  ['chomper-lime', [182, 224, 0], [93, 116, 0]], // lime
+  ['chomper-oni', [212, 32, 42], [94, 10, 15]], // Red Oni (premium)
+  ['chomper-warpaint', [224, 164, 78], [138, 75, 18]], // War Paint (premium)
 ];
 
 function buildSheet(body, outline) {

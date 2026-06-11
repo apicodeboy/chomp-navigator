@@ -26,6 +26,8 @@ interface SkinStore {
   /** True while talking to the store (purchase/restore in flight). */
   busy: boolean;
   select: (id: string) => void;
+  /** Equip a skin without an ownership check (ownership enforced by Tickets). */
+  equip: (id: string) => void;
   purchase: (id: string) => Promise<void>;
   restore: () => Promise<void>;
   owns: (id: string) => boolean;
@@ -132,12 +134,13 @@ export function SkinStoreProvider({ children }: { children: React.ReactNode }) {
       ownedIds,
       busy,
       select,
+      equip,
       purchase,
       restore,
       owns,
       paymentsEnabled: PURCHASES_ENABLED,
     }),
-    [selectedId, ownedIds, busy, select, purchase, restore, owns],
+    [selectedId, ownedIds, busy, select, equip, purchase, restore, owns],
   );
 
   return React.createElement(Ctx.Provider, { value }, children);

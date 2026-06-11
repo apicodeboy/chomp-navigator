@@ -1,10 +1,11 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Mapbox from '@rnmapbox/maps';
 import { NAV } from '@/config/mapbox';
 import { useUserLocation } from '@/hooks/useUserLocation';
@@ -18,7 +19,9 @@ import InstructionBanner from './InstructionBanner';
 import EtaBar from './EtaBar';
 import SearchPanel from './SearchPanel';
 import StoreScreen from './StoreScreen';
+import TicketBalance from './TicketBalance';
 import { useSkinStore } from '@/store/useSkinStore';
+import { useTickets } from '@/store/useTickets';
 import { theme } from '@/theme';
 import type { Place } from '@/types/navigation';
 
@@ -33,7 +36,9 @@ function fmtDuration(sec: number): string {
 export default function MapScreen() {
   const { fix, permissionDenied } = useUserLocation();
   const { selected: selectedSkin } = useSkinStore();
+  const tickets = useTickets();
   const cameraRef = useRef<React.ElementRef<typeof Mapbox.Camera>>(null);
+  const reportedRef = useRef(false);
 
   const [place, setPlace] = useState<Place | null>(null);
   const [started, setStarted] = useState(false);
@@ -47,6 +52,21 @@ export default function MapScreen() {
   );
 
   useVoiceGuidance(progress, status, voiceOn);
+
+  // On arrival, add the trip distance to the lifetime total and report it; the
+  // server credits Tickets for any newly crossed distance milestone.
+  useEffect(() => {
+    if (status === 'arrived' && route && !reportedRef.current) {
+      reportedRef.current = true;
+      (async () => {
+        const prev = parseFloat((await AsyncStorage.getItem('lifetimeMeters')) ?? '0');
+        const total = prev + route.distance;
+        await AsyncStorage.setItem('lifetimeMeters', String(total));
+        await tickets.reportDistance(total);
+      })();
+    }
+    if (status !== 'arrived') reportedRef.current = false;
+  }, [status, route, tickets]);
 
   const isPreview = status === 'preview' || status === 'loading';
   const isNav = status === 'navigating' || status === 'arrived';
@@ -205,6 +225,13 @@ export default function MapScreen() {
         </>
       )}
 
+      {/* Ticket balance (shown while navigating; tap to open the store). */}
+      {isNav && (
+        <View style={styles.ticketTop}>
+          <TicketBalance onPress={() => setStoreOpen(true)} />
+        </View>
+      )}
+
       {/* Floating controls. */}
       <TouchableOpacity style={styles.fab} onPress={() => setStoreOpen(true)}>
         <Text style={styles.fabIcon}>🛒</Text>
@@ -277,6 +304,7 @@ const styles = StyleSheet.create({
   fabMute: { bottom: 224 },
   fabRecenter: { bottom: 167 },
   fabIcon: { fontSize: 24 },
+  ticketTop: { position: 'absolute', top: 116, right: 12 },
 
   error: {
     position: 'absolute',

@@ -73,6 +73,9 @@ const config: ExpoConfig = {
     // RevenueCat public SDK keys (safe to ship — they're client keys).
     rcIosKey: process.env.REVENUECAT_IOS_KEY ?? '',
     rcAndroidKey: process.env.REVENUECAT_ANDROID_KEY ?? '',
+    // Supabase (Tickets backend). Public anon key only — safe in the client.
+    supabaseUrl: process.env.SUPABASE_URL ?? '',
+    supabaseAnonKey: process.env.SUPABASE_ANON_KEY ?? '',
     eas: { projectId: '641a1b7b-9ffd-4fa0-b5fd-4a1c08b31ae5' },
   },
 };
