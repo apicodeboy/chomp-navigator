@@ -20,9 +20,11 @@ import EtaBar from './EtaBar';
 import SearchPanel from './SearchPanel';
 import StoreScreen from './StoreScreen';
 import ProfileScreen from './ProfileScreen';
+import AuthGateModal from './AuthGateModal';
 import TicketBalance from './TicketBalance';
 import { useSkinStore } from '@/store/useSkinStore';
 import { useMapStyle } from '@/store/useMapStyle';
+import { useAuthAccount } from '@/hooks/useAuthAccount';
 import { useTickets } from '@/store/useTickets';
 import { theme } from '@/theme';
 import type { Place } from '@/types/navigation';
@@ -39,6 +41,7 @@ export default function MapScreen() {
   const { fix, permissionDenied } = useUserLocation();
   const { selected: selectedSkin } = useSkinStore();
   const { styleURL } = useMapStyle();
+  const { signedIn } = useAuthAccount();
   const tickets = useTickets();
   const cameraRef = useRef<React.ElementRef<typeof Mapbox.Camera>>(null);
   const reportedRef = useRef(false);
@@ -47,7 +50,14 @@ export default function MapScreen() {
   const [started, setStarted] = useState(false);
   const [storeOpen, setStoreOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [authGateOpen, setAuthGateOpen] = useState(false);
   const [voiceOn, setVoiceOn] = useState(true);
+
+  // The store is members-only: signed-out users are sent to sign in / sign up.
+  function openStore() {
+    if (signedIn) setStoreOpen(true);
+    else setAuthGateOpen(true);
+  }
 
   const { route, pellets, progress, status, error, reset } = useNavigation(
     place?.coord ?? null,
@@ -232,12 +242,12 @@ export default function MapScreen() {
       {/* Ticket balance (shown while navigating; tap to open the store). */}
       {isNav && (
         <View style={styles.ticketTop}>
-          <TicketBalance onPress={() => setStoreOpen(true)} />
+          <TicketBalance onPress={openStore} />
         </View>
       )}
 
       {/* Floating controls. */}
-      <TouchableOpacity style={styles.fab} onPress={() => setStoreOpen(true)}>
+      <TouchableOpacity style={styles.fab} onPress={openStore}>
         <Text style={styles.fabIcon}>🛒</Text>
       </TouchableOpacity>
       <TouchableOpacity style={[styles.fab, styles.fabProfile]} onPress={() => setProfileOpen(true)}>
@@ -262,6 +272,7 @@ export default function MapScreen() {
 
       <StoreScreen visible={storeOpen} onClose={() => setStoreOpen(false)} />
       <ProfileScreen visible={profileOpen} onClose={() => setProfileOpen(false)} />
+      <AuthGateModal visible={authGateOpen} onClose={() => setAuthGateOpen(false)} />
       {error && <Text style={styles.error}>{error}</Text>}
     </View>
   );

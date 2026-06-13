@@ -76,6 +76,10 @@ const config: ExpoConfig = {
     // Supabase (Tickets backend). Public anon key only — safe in the client.
     supabaseUrl: process.env.SUPABASE_URL ?? '',
     supabaseAnonKey: process.env.SUPABASE_ANON_KEY ?? '',
+    // Where the web auth pages (Sign In / Sign Up) are hosted. Used to send
+    // signed-out users from the in-app store to create an account. Empty =
+    // not configured yet (the in-app prompt degrades gracefully).
+    webAuthUrl: process.env.WEB_AUTH_URL ?? '',
     eas: { projectId: '641a1b7b-9ffd-4fa0-b5fd-4a1c08b31ae5' },
   },
 };
