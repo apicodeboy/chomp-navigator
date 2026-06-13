@@ -19,11 +19,9 @@ import EtaBar from './EtaBar';
 import SearchPanel from './SearchPanel';
 import StoreScreen from './StoreScreen';
 import ProfileScreen from './ProfileScreen';
-import AuthGateModal from './AuthGateModal';
 import TicketBalance from './TicketBalance';
 import { useSkinStore } from '@/store/useSkinStore';
 import { useMapStyle } from '@/store/useMapStyle';
-import { useAuthAccount } from '@/hooks/useAuthAccount';
 import { useTickets } from '@/store/useTickets';
 import { theme } from '@/theme';
 import type { Place } from '@/types/navigation';
@@ -40,7 +38,6 @@ export default function MapScreen() {
   const { fix, permissionDenied } = useUserLocation();
   const { selected: selectedSkin } = useSkinStore();
   const { styleURL } = useMapStyle();
-  const { signedIn } = useAuthAccount();
   const tickets = useTickets();
   const cameraRef = useRef<React.ElementRef<typeof Mapbox.Camera>>(null);
   const reportedRef = useRef(false);
@@ -49,14 +46,10 @@ export default function MapScreen() {
   const [started, setStarted] = useState(false);
   const [storeOpen, setStoreOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [authGateOpen, setAuthGateOpen] = useState(false);
   const [voiceOn, setVoiceOn] = useState(true);
-
-  // The store is members-only: signed-out users are sent to sign in / sign up.
-  function openStore() {
-    if (signedIn) setStoreOpen(true);
-    else setAuthGateOpen(true);
-  }
+  // Chase-cam lock. The map auto-follows the character; panning releases it and
+  // surfaces the Re-center button (like Apple Maps).
+  const [following, setFollowing] = useState(true);
 
   const { route, pellets, progress, status, error, reset } = useNavigation(
     place?.coord ?? null,
@@ -97,17 +90,10 @@ export default function MapScreen() {
     setStarted(false);
   }
 
-  function recenter() {
-    if (progress) {
-      cameraRef.current?.setCamera({
-        centerCoordinate: progress.snapped,
-        heading: progress.bearing,
-        zoomLevel: NAV.FOLLOW_ZOOM,
-        pitch: NAV.FOLLOW_PITCH,
-        animationDuration: 500,
-      });
-    }
-  }
+  // Re-lock the chase cam whenever navigation (re)starts.
+  useEffect(() => {
+    if (isNav) setFollowing(true);
+  }, [isNav]);
 
   if (permissionDenied) {
     return (
@@ -126,6 +112,10 @@ export default function MapScreen() {
         styleURL={styleURL}
         scaleBarEnabled={false}
         compassEnabled
+        onCameraChanged={(s) => {
+          // A user pan/zoom/rotate during navigation releases the chase cam.
+          if (isNav && s.gestures.isGestureActive) setFollowing(false);
+        }}
       >
         <MapFollower
           cameraRef={cameraRef}
@@ -135,6 +125,7 @@ export default function MapScreen() {
           fix={fix}
           progress={progress}
           skin={selectedSkin}
+          following={following}
         />
 
         {!isNav && <Mapbox.UserLocation visible androidRenderMode="normal" />}
@@ -214,37 +205,37 @@ export default function MapScreen() {
       {/* Ticket balance (shown while navigating; tap to open the store). */}
       {isNav && (
         <View style={styles.ticketTop}>
-          <TicketBalance onPress={openStore} />
+          <TicketBalance onPress={() => setStoreOpen(true)} />
         </View>
       )}
 
       {/* Floating controls. */}
-      <TouchableOpacity style={styles.fab} onPress={openStore}>
+      <TouchableOpacity style={styles.fab} onPress={() => setStoreOpen(true)}>
         <Text style={styles.fabIcon}>🛒</Text>
       </TouchableOpacity>
       <TouchableOpacity style={[styles.fab, styles.fabProfile]} onPress={() => setProfileOpen(true)}>
         <Text style={styles.fabIcon}>👤</Text>
       </TouchableOpacity>
       {isNav && (
-        <>
-          <TouchableOpacity
-            style={[styles.fab, styles.fabMute]}
-            onPress={() => setVoiceOn((v) => !v)}
-          >
-            <Text style={styles.fabIcon}>{voiceOn ? '🔊' : '🔇'}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.fab, styles.fabRecenter]}
-            onPress={recenter}
-          >
-            <Text style={styles.fabIcon}>🧭</Text>
-          </TouchableOpacity>
-        </>
+        <TouchableOpacity
+          style={[styles.fab, styles.fabMute]}
+          onPress={() => setVoiceOn((v) => !v)}
+        >
+          <Text style={styles.fabIcon}>{voiceOn ? '🔊' : '🔇'}</Text>
+        </TouchableOpacity>
+      )}
+      {/* Re-center appears only after the user has panned away from the chase cam. */}
+      {isNav && !following && (
+        <TouchableOpacity
+          style={[styles.fab, styles.fabRecenter, styles.fabRecenterActive]}
+          onPress={() => setFollowing(true)}
+        >
+          <Text style={styles.fabIcon}>🧭</Text>
+        </TouchableOpacity>
       )}
 
       <StoreScreen visible={storeOpen} onClose={() => setStoreOpen(false)} />
       <ProfileScreen visible={profileOpen} onClose={() => setProfileOpen(false)} />
-      <AuthGateModal visible={authGateOpen} onClose={() => setAuthGateOpen(false)} />
       {error && <Text style={styles.error}>{error}</Text>}
     </View>
   );
@@ -294,6 +285,7 @@ const styles = StyleSheet.create({
   },
   fabProfile: { bottom: 167 },
   fabRecenter: { bottom: 224 },
+  fabRecenterActive: { backgroundColor: theme.colors.accent, borderColor: theme.colors.accent },
   fabMute: { bottom: 281 },
   fabIcon: { fontSize: 24 },
   ticketTop: { position: 'absolute', top: 116, right: 12 },

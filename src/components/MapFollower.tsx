@@ -15,6 +15,9 @@ interface Props {
   fix: UserFix | null;
   progress: NavProgress | null;
   skin: ChomperSkin;
+  /** When false (user panned away), the character keeps moving but the camera
+   * stays put until they tap Re-center. */
+  following: boolean;
 }
 
 // How aggressively the displayed position chases the GPS-derived estimate.
@@ -26,6 +29,8 @@ const COMMIT_MS = 22;
 // Never dead-reckon more than this far past the last fix (s) — avoids overshoot
 // if GPS stalls.
 const MAX_EXTRAP_S = 2;
+// Animated catch-up duration when the user taps Re-center.
+const RECENTER_MS = 450;
 
 /**
  * Owns the camera and the navigating character. While navigating it runs a
@@ -46,6 +51,7 @@ export default function MapFollower({
   fix,
   progress,
   skin,
+  following,
 }: Props) {
   const sampler = useMemo(() => (route ? makeRouteSampler(route.line) : null), [route]);
 
@@ -58,6 +64,16 @@ export default function MapFollower({
   const rafRef = useRef<number | null>(null);
   const lastCommit = useRef(0);
   const lastFrame = useRef(0);
+  // Follow state is read inside the rAF loop via a ref so toggling it doesn't
+  // restart the loop. `wasFollowing` lets us detect the false→true (Re-center)
+  // edge to play one animated catch-up; `resumeUntil` holds the camera off
+  // instant-driving until that animation finishes.
+  const followingRef = useRef(following);
+  const wasFollowing = useRef(true);
+  const resumeUntil = useRef(0);
+  useEffect(() => {
+    followingRef.current = following;
+  }, [following]);
 
   // Capture each new GPS-derived progress sample.
   useEffect(() => {
@@ -104,14 +120,26 @@ export default function MapFollower({
       if (now - lastCommit.current >= COMMIT_MS) {
         lastCommit.current = now;
         const s = sampler.at(displayDist.current);
-        setMarker(s);
-        cameraRef.current?.setCamera({
-          centerCoordinate: s.position,
-          heading: s.bearing,
-          pitch: NAV.FOLLOW_PITCH,
-          zoomLevel: NAV.FOLLOW_ZOOM,
-          animationDuration: 0,
-        });
+        setMarker(s); // the character always keeps moving along the route
+
+        if (followingRef.current) {
+          const target = {
+            centerCoordinate: s.position,
+            heading: s.bearing,
+            pitch: NAV.FOLLOW_PITCH,
+            zoomLevel: NAV.FOLLOW_ZOOM,
+          };
+          if (!wasFollowing.current) {
+            // Just tapped Re-center: animate a smooth catch-up from wherever the
+            // user panned to, then hand back to instant per-frame driving.
+            resumeUntil.current = now + RECENTER_MS;
+            cameraRef.current?.setCamera({ ...target, animationDuration: RECENTER_MS });
+          } else if (now >= resumeUntil.current) {
+            cameraRef.current?.setCamera({ ...target, animationDuration: 0 });
+          }
+          // else: inside the catch-up window — let the animation play out.
+        }
+        wasFollowing.current = followingRef.current;
       }
       rafRef.current = requestAnimationFrame(tick);
     };
