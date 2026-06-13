@@ -11,10 +11,9 @@ import { NAV } from '@/config/mapbox';
 import { useUserLocation } from '@/hooks/useUserLocation';
 import { useNavigation } from '@/hooks/useNavigation';
 import { useVoiceGuidance } from '@/hooks/useVoiceGuidance';
-import { routeBounds } from '@/utils/geo';
 import RouteLayers from './RouteLayers';
 import PreviewLayer from './PreviewLayer';
-import ChomperMarker from './ChomperMarker';
+import MapFollower from './MapFollower';
 import InstructionBanner from './InstructionBanner';
 import EtaBar from './EtaBar';
 import SearchPanel from './SearchPanel';
@@ -128,34 +127,14 @@ export default function MapScreen() {
         scaleBarEnabled={false}
         compassEnabled
       >
-        <Mapbox.Camera
-          ref={cameraRef}
-          {...(isNav && progress
-            ? {
-                // Chase cam: center on the snapped point, rotate to travel direction.
-                centerCoordinate: progress.snapped,
-                heading: progress.bearing,
-                pitch: NAV.FOLLOW_PITCH,
-                zoomLevel: NAV.FOLLOW_ZOOM,
-                animationMode: 'linearTo' as const,
-                animationDuration: 800,
-              }
-            : isPreview && route
-              ? {
-                  // Fit the whole route on screen for the preview.
-                  bounds: {
-                    ...routeBounds(route.line),
-                    paddingTop: 120,
-                    paddingBottom: 220,
-                    paddingLeft: 60,
-                    paddingRight: 60,
-                  },
-                  animationDuration: 600,
-                }
-              : {
-                  followUserLocation: true,
-                  followZoomLevel: NAV.FOLLOW_ZOOM,
-                })}
+        <MapFollower
+          cameraRef={cameraRef}
+          isNav={isNav}
+          isPreview={isPreview}
+          route={route}
+          fix={fix}
+          progress={progress}
+          skin={selectedSkin}
         />
 
         {!isNav && <Mapbox.UserLocation visible androidRenderMode="normal" />}
@@ -169,13 +148,6 @@ export default function MapScreen() {
             pellets={pellets}
             distAlong={progress.distAlong}
             leadM={NAV.PELLET_LEAD_M}
-          />
-        )}
-        {isNav && progress && (
-          <ChomperMarker
-            coordinate={progress.snapped}
-            rotationDeg={0}
-            skin={selectedSkin}
           />
         )}
       </Mapbox.MapView>
