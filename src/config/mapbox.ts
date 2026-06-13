@@ -35,6 +35,33 @@ export const NAV = {
   FOLLOW_ZOOM: 17,
   /** Camera pitch (tilt) for a chase-cam feel. 0 = top-down. */
   FOLLOW_PITCH: 55,
-  /** Map style — dark to match the yellow ride-app theme. */
+  /** Default map style — dark to match the yellow ride-app theme. */
   STYLE_URL: 'mapbox://styles/mapbox/dark-v11',
 } as const;
+
+/**
+ * Selectable map styles. The first entry is the default and is always available
+ * (including to signed-out users). The rest are premium and unlock only with a
+ * real account — see `useMapStyle`.
+ */
+export interface MapStyleOption {
+  id: string;
+  name: string;
+  url: string;
+  /** Free/default styles are undefined; premium ones are gated on a real account. */
+  premium?: boolean;
+}
+
+export const MAP_STYLES: MapStyleOption[] = [
+  { id: 'default', name: 'Classic Dark', url: 'mapbox://styles/mapbox/dark-v11' },
+  { id: 'light', name: 'Daylight', url: 'mapbox://styles/mapbox/light-v11', premium: true },
+  { id: 'streets', name: 'Streets', url: 'mapbox://styles/mapbox/streets-v12', premium: true },
+  { id: 'satellite', name: 'Satellite', url: 'mapbox://styles/mapbox/satellite-streets-v12', premium: true },
+  { id: 'navigation', name: 'Night Nav', url: 'mapbox://styles/mapbox/navigation-night-v1', premium: true },
+];
+
+export const DEFAULT_MAP_STYLE_ID = MAP_STYLES[0].id;
+
+export function getMapStyle(id: string): MapStyleOption {
+  return MAP_STYLES.find((s) => s.id === id) ?? MAP_STYLES[0];
+}

@@ -1,22 +1,22 @@
 import { useState } from "react";
 import { supabase } from "./supabaseClient";
+import AuthLayout, { GoogleButton, AppleButton, Divider, styles } from "./AuthLayout.jsx";
 
-// Read the email + "just signed up" flag passed from Sign Up via the query string.
 function getSignupParams() {
   const p = new URLSearchParams(window.location.search);
   return { email: p.get("email") || "", justSignedUp: p.get("signup") === "1" };
 }
 
-// Sign In — email/password via Supabase Auth.
 export default function SignIn() {
   const initial = getSignupParams();
 
-  const [email, setEmail] = useState(initial.email); // pre-filled if coming from signup
+  const [email, setEmail] = useState(initial.email);
   const [password, setPassword] = useState("");
+  const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState("");
   const [notice] = useState(
     initial.justSignedUp
-      ? "Your account has been created. Please check your email and verify your address before logging in."
+      ? "Account created! Check your email to verify your address before signing in."
       : ""
   );
 
@@ -25,62 +25,82 @@ export default function SignIn() {
     setError("");
 
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) { setError(error.message); return; }
 
-    if (error) {
-      setError(error.message); // show Supabase error under the form
-      return;
-    }
-
-    // Only redirect when a real session actually exists.
     if (!data.session) {
-      setError("Check your email and confirm your account before logging in.");
+      setError("Check your email and confirm your account before signing in.");
       return;
     }
-
-    window.location.assign("/"); // success → redirect to Home
+    window.location.assign("/");
   }
 
-  // Google OAuth — Supabase opens the Google consent screen, then redirects back.
-  async function handleGoogle() {
+  async function handleOAuth(provider) {
     setError("");
     const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: window.location.origin + "/" }, // return to Home after auth
+      provider,
+      options: { redirectTo: window.location.origin + "/" },
     });
     if (error) setError(error.message);
-    // on success the browser navigates to Google; nothing else to do here.
   }
 
   return (
-    <form onSubmit={handleSignIn}>
-      <h1>Sign In</h1>
+    <AuthLayout
+      mode="login"
+      heading="Welcome back"
+      sub="Please enter your details to sign in."
+    >
+      {notice && <p style={styles.notice}>{notice}</p>}
 
-      {/* success message shown above the form when arriving from signup */}
-      {notice && <p style={{ color: "green", fontSize: 13, marginBottom: 12 }}>{notice}</p>}
+      <GoogleButton onClick={() => handleOAuth("google")} />
+      <AppleButton onClick={() => handleOAuth("apple")} />
 
-      <input
-        type="email"
-        placeholder="Email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        required
-      />
+      <Divider />
 
-      <input
-        type="password"
-        placeholder="Password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        required
-      />
+      <form onSubmit={handleSignIn}>
+        <label style={{ ...styles.label, marginTop: 0 }}>Email address</label>
+        <input
+          className="mw-input"
+          style={styles.input}
+          type="email"
+          placeholder="Enter your email address"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
 
-      <button type="submit">Sign In</button>
+        <label style={styles.label}>Password</label>
+        <div style={{ position: "relative" }}>
+          <input
+            className="mw-input"
+            style={{ ...styles.input, paddingRight: 44 }}
+            type={showPw ? "text" : "password"}
+            placeholder="Enter your password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+          <button
+            type="button"
+            onClick={() => setShowPw((v) => !v)}
+            style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", border: "none", background: "none", cursor: "pointer", color: "#9ca3af", fontSize: 13 }}
+          >
+            {showPw ? "Hide" : "Show"}
+          </button>
+        </div>
 
-      {/* OAuth — added because there was no existing Google button */}
-      <button type="button" onClick={handleGoogle}>Continue with Google</button>
+        <button type="submit" className="mw-primary" style={styles.primary}>
+          Sign in
+        </button>
 
-      {/* small error message under the form */}
-      {error && <p style={{ color: "red", fontSize: 13, marginTop: 8 }}>{error}</p>}
-    </form>
+        {error && <p style={styles.error}>{error}</p>}
+      </form>
+
+      <p style={styles.footer}>
+        Don&apos;t have an account?{" "}
+        <span style={styles.footerLink} onClick={() => window.location.assign("/signup")}>
+          Sign up
+        </span>
+      </p>
+    </AuthLayout>
   );
 }

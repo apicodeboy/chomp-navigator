@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { supabase } from "./supabaseClient";
+import AuthLayout, { GoogleButton, AppleButton, Divider, styles } from "./AuthLayout.jsx";
 
-// Sign Up — email/password via Supabase Auth.
 export default function SignUp() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState("");
 
   async function handleSignUp(e) {
@@ -12,54 +13,84 @@ export default function SignUp() {
     setError("");
 
     const { error } = await supabase.auth.signUp({ email, password });
+    if (error) { setError(error.message); return; }
 
-    if (error) {
-      setError(error.message); // show Supabase error under the form
-      return;
-    }
-
-    // Do NOT auto-login. Send the user to Sign In, passing the email (and a
-    // "signup" flag) via the query string so Sign In can pre-fill + greet them.
+    // Don't auto-login — send to Sign In with the email pre-filled.
     window.location.assign("/login?signup=1&email=" + encodeURIComponent(email));
   }
 
-  // Google OAuth — Supabase opens the Google consent screen, then redirects back.
-  async function handleGoogle() {
+  async function handleOAuth(provider) {
     setError("");
     const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: window.location.origin + "/" }, // return to Home after auth
+      provider,
+      options: { redirectTo: window.location.origin + "/" },
     });
     if (error) setError(error.message);
   }
 
   return (
-    <form onSubmit={handleSignUp}>
-      <h1>Sign Up</h1>
+    <AuthLayout
+      mode="signup"
+      heading="Create an account"
+      sub="Please enter your details to create an account."
+    >
+      <GoogleButton onClick={() => handleOAuth("google")} />
+      <AppleButton onClick={() => handleOAuth("apple")} />
 
-      <input
-        type="email"
-        placeholder="Email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        required
-      />
+      <Divider />
 
-      <input
-        type="password"
-        placeholder="Password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        required
-      />
+      <form onSubmit={handleSignUp}>
+        <label style={{ ...styles.label, marginTop: 0 }}>Email address</label>
+        <input
+          className="mw-input"
+          style={styles.input}
+          type="email"
+          placeholder="Enter your email address"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
 
-      <button type="submit">Sign Up</button>
+        <label style={styles.label}>Password</label>
+        <div style={{ position: "relative" }}>
+          <input
+            className="mw-input"
+            style={{ ...styles.input, paddingRight: 44 }}
+            type={showPw ? "text" : "password"}
+            placeholder="Enter your password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+          <button
+            type="button"
+            onClick={() => setShowPw((v) => !v)}
+            style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", border: "none", background: "none", cursor: "pointer", color: "#9ca3af", fontSize: 13 }}
+          >
+            {showPw ? "Hide" : "Show"}
+          </button>
+        </div>
 
-      {/* OAuth — added because there was no existing Google button */}
-      <button type="button" onClick={handleGoogle}>Continue with Google</button>
+        <button type="submit" className="mw-primary" style={styles.primary}>
+          Create an account
+        </button>
 
-      {/* small error message under the form */}
-      {error && <p style={{ color: "red", fontSize: 13, marginTop: 8 }}>{error}</p>}
-    </form>
+        <label style={styles.checkRow}>
+          <input type="checkbox" style={{ marginTop: 2 }} />
+          <span style={styles.checkText}>
+            Please keep me updated by email with the latest news, route features, reward programs, and event updates.
+          </span>
+        </label>
+
+        {error && <p style={styles.error}>{error}</p>}
+      </form>
+
+      <p style={styles.footer}>
+        Already have an account?{" "}
+        <span style={styles.footerLink} onClick={() => window.location.assign("/login")}>
+          Sign in
+        </span>
+      </p>
+    </AuthLayout>
   );
 }

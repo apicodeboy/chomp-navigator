@@ -7,6 +7,7 @@ import React, {
   useState,
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuthAccount } from '@/hooks/useAuthAccount';
 import { DEFAULT_SKIN_ID, getSkin, SKINS, type SkinListing } from './skins';
 import {
   activeEntitlements,
@@ -33,6 +34,11 @@ interface SkinStore {
   owns: (id: string) => boolean;
   /** Whether real payments are wired up (vs. the dev fallback). */
   paymentsEnabled: boolean;
+  /**
+   * True only when signed in to a real (non-anonymous) account. Customization is
+   * gated on this: signed-out users are locked to the default character.
+   */
+  signedIn: boolean;
 }
 
 const Ctx = createContext<SkinStore | null>(null);
@@ -49,9 +55,20 @@ function skinIdsFromEntitlements(entitlements: string[]): string[] {
 }
 
 export function SkinStoreProvider({ children }: { children: React.ReactNode }) {
+  const { signedIn } = useAuthAccount();
   const [selectedId, setSelectedId] = useState<string>(DEFAULT_SKIN_ID);
   const [ownedIds, setOwnedIds] = useState<string[]>(FREE_IDS);
   const [busy, setBusy] = useState(false);
+
+  // Customization is gated on a real account. While signed out, the equipped
+  // character is forced back to the default so signed-out users can't keep a
+  // previously-equipped premium skin.
+  useEffect(() => {
+    if (!signedIn && selectedId !== DEFAULT_SKIN_ID) {
+      setSelectedId(DEFAULT_SKIN_ID);
+      void AsyncStorage.setItem(KEY_SELECTED, DEFAULT_SKIN_ID);
+    }
+  }, [signedIn, selectedId]);
 
   // Boot: restore selection, configure RevenueCat, hydrate ownership.
   useEffect(() => {
@@ -76,20 +93,28 @@ export function SkinStoreProvider({ children }: { children: React.ReactNode }) {
 
   const select = useCallback(
     (id: string) => {
+      // Signed-out users may only select the default character.
+      if (!signedIn && id !== DEFAULT_SKIN_ID) return;
       if (!ownedIds.includes(id)) return;
       setSelectedId(id);
       void AsyncStorage.setItem(KEY_SELECTED, id);
     },
-    [ownedIds],
+    [ownedIds, signedIn],
   );
 
-  const equip = useCallback((id: string) => {
-    setSelectedId(id);
-    void AsyncStorage.setItem(KEY_SELECTED, id);
-  }, []);
+  const equip = useCallback(
+    (id: string) => {
+      // Signed-out users may only equip the default character.
+      if (!signedIn && id !== DEFAULT_SKIN_ID) return;
+      setSelectedId(id);
+      void AsyncStorage.setItem(KEY_SELECTED, id);
+    },
+    [signedIn],
+  );
 
   const purchase = useCallback(
     async (id: string) => {
+      if (!signedIn) return; // can't buy/equip premium characters while signed out
       const skin = getSkin(id);
       if (!skin.productId) return; // free skin, nothing to buy
       setBusy(true);
@@ -112,7 +137,7 @@ export function SkinStoreProvider({ children }: { children: React.ReactNode }) {
         setBusy(false);
       }
     },
-    [ownedIds, equip],
+    [ownedIds, equip, signedIn],
   );
 
   const restore = useCallback(async () => {
@@ -139,8 +164,9 @@ export function SkinStoreProvider({ children }: { children: React.ReactNode }) {
       restore,
       owns,
       paymentsEnabled: PURCHASES_ENABLED,
+      signedIn,
     }),
-    [selectedId, ownedIds, busy, select, equip, purchase, restore, owns],
+    [selectedId, ownedIds, busy, select, equip, purchase, restore, owns, signedIn],
   );
 
   return React.createElement(Ctx.Provider, { value }, children);

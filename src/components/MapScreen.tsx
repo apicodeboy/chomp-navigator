@@ -22,6 +22,7 @@ import StoreScreen from './StoreScreen';
 import ProfileScreen from './ProfileScreen';
 import TicketBalance from './TicketBalance';
 import { useSkinStore } from '@/store/useSkinStore';
+import { useMapStyle } from '@/store/useMapStyle';
 import { useTickets } from '@/store/useTickets';
 import { theme } from '@/theme';
 import type { Place } from '@/types/navigation';
@@ -37,6 +38,7 @@ function fmtDuration(sec: number): string {
 export default function MapScreen() {
   const { fix, permissionDenied } = useUserLocation();
   const { selected: selectedSkin } = useSkinStore();
+  const { styleURL } = useMapStyle();
   const tickets = useTickets();
   const cameraRef = useRef<React.ElementRef<typeof Mapbox.Camera>>(null);
   const reportedRef = useRef(false);
@@ -112,7 +114,7 @@ export default function MapScreen() {
     <View style={styles.fill}>
       <Mapbox.MapView
         style={styles.fill}
-        styleURL={NAV.STYLE_URL}
+        styleURL={styleURL}
         scaleBarEnabled={false}
         compassEnabled
       >
