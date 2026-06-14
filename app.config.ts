@@ -17,6 +17,7 @@ const config: ExpoConfig = {
   slug: 'map-wrlds',
   owner: 'apicodeboy',
   version: '1.0.0',
+  icon: './assets/icon.png',
   orientation: 'portrait',
   scheme: 'mapwrlds',
   userInterfaceStyle: 'automatic',

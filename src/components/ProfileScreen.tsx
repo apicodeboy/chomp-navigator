@@ -14,9 +14,32 @@ const METERS_PER_MILE = 1609.34;
  * traveled (server progress), Ticket balance, and progress toward the next free
  * distance-milestone reward.
  */
-export default function ProfileScreen({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+interface Props {
+  visible: boolean;
+  onClose: () => void;
+  onOpenStore: () => void;
+  onOpenSettings: () => void;
+  onOpenFavorites: () => void;
+  onOpenAccount: () => void;
+}
+
+export default function ProfileScreen({
+  visible,
+  onClose,
+  onOpenStore,
+  onOpenSettings,
+  onOpenFavorites,
+  onOpenAccount,
+}: Props) {
   const { selectedId } = useSkinStore();
   const { balance, progressMeters, owns, enabled } = useTickets();
+
+  const MENU: { icon: string; label: string; onPress: () => void }[] = [
+    { icon: '🔑', label: 'Account', onPress: onOpenAccount },
+    { icon: '⚙️', label: 'Settings', onPress: onOpenSettings },
+    { icon: '🛒', label: 'Store', onPress: onOpenStore },
+    { icon: '⭐', label: 'Saved', onPress: onOpenFavorites },
+  ];
 
   // free skins are owned by default; plus anything bought (server owned set)
   const ownedSkins = SKINS.filter((s) => s.ticketPrice === 0 || owns(s.id));
@@ -47,6 +70,17 @@ export default function ProfileScreen({ visible, onClose }: { visible: boolean; 
                 <Stat value={`${ownedSkins.length}`} label="characters" />
                 <Stat value={enabled && balance !== null ? `🎟 ${balance}` : '🎟 —'} label="tickets" />
               </View>
+            </View>
+
+            <View style={styles.menuRow}>
+              {MENU.map((m) => (
+                <TouchableOpacity key={m.label} style={styles.menuItem} onPress={m.onPress}>
+                  <View style={styles.menuCircle}>
+                    <Text style={styles.menuIcon}>{m.icon}</Text>
+                  </View>
+                  <Text style={styles.menuLabel}>{m.label}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
 
             <Text style={styles.section}>Rewards</Text>
@@ -108,6 +142,18 @@ const styles = StyleSheet.create({
   stat: { alignItems: 'center' },
   statValue: { color: theme.colors.textPrimary, fontSize: 20, fontWeight: '800' },
   statLabel: { color: theme.colors.textSecondary, fontSize: 12, marginTop: 2 },
+  menuRow: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 18 },
+  menuItem: { alignItems: 'center' },
+  menuCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: theme.colors.cardElevated,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuIcon: { fontSize: 24 },
+  menuLabel: { color: theme.colors.textSecondary, fontSize: 12, marginTop: 6 },
   section: { color: theme.colors.textPrimary, fontSize: 18, fontWeight: '800', marginTop: 22, marginBottom: 10 },
   reward: { backgroundColor: theme.colors.cardElevated, borderRadius: theme.radius.md, padding: 16 },
   rewardTitle: { color: theme.colors.textPrimary, fontWeight: '800', fontSize: 15 },

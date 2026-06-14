@@ -87,8 +87,12 @@ export async function fetchRoutes(
   origin: Position,
   destination: Position,
   profile: 'driving' | 'driving-traffic' | 'walking' | 'cycling' = 'driving-traffic',
+  waypoints: Position[] = [],
 ): Promise<NavRoute[]> {
-  const coords = `${origin[0]},${origin[1]};${destination[0]},${destination[1]}`;
+  // origin → (stops) → destination
+  const coords = [origin, ...waypoints, destination]
+    .map((p) => `${p[0]},${p[1]}`)
+    .join(';');
   const url =
     `${DIRECTIONS}/${profile}/${coords}` +
     `?alternatives=true&geometries=geojson&overview=full&steps=true` +

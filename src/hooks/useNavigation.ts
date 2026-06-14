@@ -42,6 +42,7 @@ export function useNavigation(
   destination: Position | null,
   fix: UserFix | null,
   started: boolean,
+  waypoints: Position[] = [],
 ) {
   const [routes, setRoutes] = useState<NavRoute[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -77,13 +78,16 @@ export function useNavigation(
     setPellets(buildPellets(route.line, NAV.PELLET_SPACING_M));
   }, [route]);
 
-  /** Load route alternatives from `origin` to `dest`. */
-  const loadRoutes = useCallback(async (origin: Position, dest: Position) => {
-    const rs = await fetchRoutes(origin, dest);
-    setRoutes(rs);
-    setSelectedIndex(0);
-    return rs;
-  }, []);
+  /** Load route alternatives from `origin` to `dest`, through any added stops. */
+  const loadRoutes = useCallback(
+    async (origin: Position, dest: Position) => {
+      const rs = await fetchRoutes(origin, dest, 'driving-traffic', waypoints);
+      setRoutes(rs);
+      setSelectedIndex(0);
+      return rs;
+    },
+    [waypoints],
+  );
 
   /** Pick one of the alternatives (only meaningful during the preview step). */
   const selectRoute = useCallback((index: number) => {

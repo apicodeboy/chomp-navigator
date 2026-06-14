@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  Share,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -16,8 +17,8 @@ import PreviewLayer from './PreviewLayer';
 import MapFollower from './MapFollower';
 import ChomperMarker from './ChomperMarker';
 import InstructionBanner from './InstructionBanner';
-import EtaBar from './EtaBar';
-import SearchSheet from './SearchSheet';
+import NavPanel from './NavPanel';
+import SearchPanel from './SearchPanel';
 import StoreScreen from './StoreScreen';
 import ProfileScreen from './ProfileScreen';
 import SettingsModal from './SettingsModal';
@@ -30,9 +31,10 @@ import { useTickets } from '@/store/useTickets';
 import { useSettings } from '@/store/useSettings';
 import { addFavorite, isFavorite } from '@/lib/favorites';
 import { formatDistance, formatDuration } from '@/utils/format';
-import { straightLineM } from '@/utils/geo';
+import { routeBounds, straightLineM } from '@/utils/geo';
 import { theme } from '@/theme';
 import type { Place } from '@/types/navigation';
+import type { Position } from 'geojson';
 
 export default function MapScreen() {
   const { fix, permissionDenied } = useUserLocation();
@@ -48,6 +50,8 @@ export default function MapScreen() {
   // user taps "Go" (then we fetch route alternatives).
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [routingTo, setRoutingTo] = useState<Place | null>(null);
+  const [waypoints, setWaypoints] = useState<Position[]>([]);
+  const [addingStop, setAddingStop] = useState(false);
   const [started, setStarted] = useState(false);
   const [storeOpen, setStoreOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -60,7 +64,7 @@ export default function MapScreen() {
   const [following, setFollowing] = useState(true);
 
   const { route, routes, selectedIndex, selectRoute, pellets, progress, status, error, reset } =
-    useNavigation(routingTo?.coord ?? null, fix, started);
+    useNavigation(routingTo?.coord ?? null, fix, started, waypoints);
 
   useVoiceGuidance(progress, status, voiceOn);
 
@@ -117,7 +121,52 @@ export default function MapScreen() {
     reset();
     setSelectedPlace(null);
     setRoutingTo(null);
+    setWaypoints([]);
+    setAddingStop(false);
     setStarted(false);
+  }
+
+  // The route is "active" once a destination is picked (place card, route
+  // options, or navigating) — this swaps the idle controls for the nav controls.
+  const inRoute = selectedPlace !== null || isPreview || isNav;
+
+  // Overview: release follow and frame the whole route (or the selected place).
+  function overview() {
+    setFollowing(false);
+    if (route) {
+      cameraRef.current?.setCamera({
+        bounds: {
+          ...routeBounds(route.line),
+          paddingTop: 120,
+          paddingBottom: 260,
+          paddingLeft: 60,
+          paddingRight: 60,
+        },
+        animationDuration: 500,
+      });
+    } else if (selectedPlace) {
+      cameraRef.current?.setCamera({
+        centerCoordinate: selectedPlace.coord,
+        zoomLevel: 14,
+        animationDuration: 500,
+      });
+    }
+  }
+
+  async function shareEta() {
+    const mins = Math.max(1, Math.round(remainingSec / 60));
+    const dest = routingTo?.name ?? selectedPlace?.name ?? 'my destination';
+    const left = progress ? formatDistance(progress.distRemaining, units) : '';
+    try {
+      await Share.share({ message: `On my way to ${dest} — ETA ${mins} min${left ? ` (${left} to go)` : ''}.` });
+    } catch {
+      // user cancelled the share sheet
+    }
+  }
+
+  function handleAddStopPick(p: Place) {
+    setWaypoints((prev) => [...prev, p.coord]);
+    setAddingStop(false);
   }
 
   // Re-lock the chase cam whenever navigation (re)starts.
@@ -215,9 +264,9 @@ export default function MapScreen() {
 
       {/* ---------- Overlays per phase ---------- */}
 
-      {/* Idle: Apple-style bottom search sheet (hidden once a place is selected). */}
+      {/* Idle: search (hidden once a place is selected). */}
       {status === 'idle' && !selectedPlace && (
-        <SearchSheet near={fix?.coord ?? null} onPick={pickPlace} />
+        <SearchPanel near={fix?.coord ?? null} onPick={pickPlace} />
       )}
 
       {/* Place selected: detail card with a Go button (no route computed yet). */}
@@ -313,13 +362,28 @@ export default function MapScreen() {
               </TouchableOpacity>
             </View>
           ) : (
-            <EtaBar
-              distRemainingM={progress.distRemaining}
-              remainingSec={remainingSec}
-              units={units}
-              onStop={cancel}
-            />
+            !addingStop && (
+              <NavPanel
+                distRemainingM={progress.distRemaining}
+                remainingSec={remainingSec}
+                units={units}
+                onStop={cancel}
+                onAddStop={() => setAddingStop(true)}
+                onShareEta={shareEta}
+                onCharacterSelect={() => setStoreOpen(true)}
+              />
+            )
           )}
+        </>
+      )}
+
+      {/* Add-stop search overlay (during navigation). */}
+      {addingStop && (
+        <>
+          <SearchPanel near={fix?.coord ?? null} onPick={handleAddStopPick} />
+          <TouchableOpacity style={styles.addStopCancel} onPress={() => setAddingStop(false)}>
+            <Text style={styles.addStopCancelText}>Cancel adding stop</Text>
+          </TouchableOpacity>
         </>
       )}
 
@@ -330,40 +394,46 @@ export default function MapScreen() {
         </View>
       )}
 
-      {/* Floating controls — bottom-right stack. */}
-      <TouchableOpacity style={[styles.fab, styles.fabStore]} onPress={() => setStoreOpen(true)}>
-        <Text style={styles.fabIcon}>🛒</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={[styles.fab, styles.fabProfile]} onPress={() => setProfileOpen(true)}>
-        <Text style={styles.fabIcon}>👤</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={[styles.fab, styles.fabFavorites]} onPress={() => setFavoritesOpen(true)}>
-        <Text style={styles.fabIcon}>⭐</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={[styles.fab, styles.fabSettings]} onPress={() => setSettingsOpen(true)}>
-        <Text style={styles.fabIcon}>⚙️</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={[styles.fab, styles.fabAccount]} onPress={() => setAccountOpen(true)}>
-        <Text style={styles.fabIcon}>🔑</Text>
-      </TouchableOpacity>
-      {/* Always-on re-center; highlighted when navigation has been panned away. */}
-      <TouchableOpacity
-        style={[styles.fab, styles.fabRecenter, isNav && !following && styles.fabRecenterActive]}
-        onPress={recenter}
-      >
-        <Text style={styles.fabIcon}>🧭</Text>
-      </TouchableOpacity>
-      {isNav && (
-        <TouchableOpacity
-          style={[styles.fab, styles.fabMute]}
-          onPress={() => setVoiceOn(!voiceOn)}
-        >
-          <Text style={styles.fabIcon}>{voiceOn ? '🔊' : '🔇'}</Text>
-        </TouchableOpacity>
+      {/* Floating controls — bottom-right stack. Idle: store / profile / recenter.
+          Once a route is active: overview / recenter / audio. */}
+      {!inRoute ? (
+        <>
+          <TouchableOpacity style={[styles.fab, styles.fabPos1]} onPress={() => setStoreOpen(true)}>
+            <Text style={styles.fabIcon}>🛒</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.fab, styles.fabPos2]} onPress={() => setProfileOpen(true)}>
+            <Text style={styles.fabIcon}>👤</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.fab, styles.fabPos3]} onPress={recenter}>
+            <Text style={styles.fabIcon}>🧭</Text>
+          </TouchableOpacity>
+        </>
+      ) : (
+        <>
+          <TouchableOpacity style={[styles.fab, styles.fabPos1]} onPress={overview}>
+            <Text style={styles.fabIcon}>⤢</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.fab, styles.fabPos2, isNav && !following && styles.fabRecenterActive]}
+            onPress={recenter}
+          >
+            <Text style={styles.fabIcon}>🧭</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.fab, styles.fabPos3]} onPress={() => setVoiceOn(!voiceOn)}>
+            <Text style={styles.fabIcon}>{voiceOn ? '🔊' : '🔇'}</Text>
+          </TouchableOpacity>
+        </>
       )}
 
       <StoreScreen visible={storeOpen} onClose={() => setStoreOpen(false)} />
-      <ProfileScreen visible={profileOpen} onClose={() => setProfileOpen(false)} />
+      <ProfileScreen
+        visible={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        onOpenStore={() => { setProfileOpen(false); setStoreOpen(true); }}
+        onOpenSettings={() => { setProfileOpen(false); setSettingsOpen(true); }}
+        onOpenFavorites={() => { setProfileOpen(false); setFavoritesOpen(true); }}
+        onOpenAccount={() => { setProfileOpen(false); setAccountOpen(true); }}
+      />
       <FavoritesModal visible={favoritesOpen} onClose={() => setFavoritesOpen(false)} onPick={pickPlace} />
       <SettingsModal visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <AccountModal visible={accountOpen} onClose={() => setAccountOpen(false)} />
@@ -446,16 +516,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // Bottom-right vertical stack (57px pitch).
-  fabStore: { bottom: 110 },
-  fabProfile: { bottom: 167 },
-  fabFavorites: { bottom: 224 },
-  fabSettings: { bottom: 281 },
-  fabAccount: { bottom: 338 },
-  fabRecenter: { bottom: 395 },
+  // Bottom-right vertical stack of three (57px pitch).
+  fabPos1: { bottom: 110 },
+  fabPos2: { bottom: 167 },
+  fabPos3: { bottom: 224 },
   fabRecenterActive: { backgroundColor: theme.colors.accent, borderColor: theme.colors.accent },
-  fabMute: { bottom: 452 },
   fabIcon: { fontSize: 24 },
+
+  addStopCancel: {
+    position: 'absolute',
+    bottom: 24,
+    alignSelf: 'center',
+    backgroundColor: theme.colors.overlay,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.pill,
+    paddingVertical: 12,
+    paddingHorizontal: 22,
+  },
+  addStopCancelText: { color: theme.colors.danger, fontWeight: '700', fontSize: 15 },
   ticketTop: { position: 'absolute', top: 116, right: 12 },
 
   error: {
