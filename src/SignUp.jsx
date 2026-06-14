@@ -3,6 +3,9 @@ import { supabase } from "./supabaseClient";
 import AuthLayout, { GoogleButton, AppleButton, Divider, styles } from "./AuthLayout.jsx";
 
 export default function SignUp() {
+  const returnTo = new URLSearchParams(window.location.search).get("return") || "";
+  const appSuffix = returnTo === "app" ? "?return=app" : "";
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -15,15 +18,17 @@ export default function SignUp() {
     const { error } = await supabase.auth.signUp({ email, password });
     if (error) { setError(error.message); return; }
 
-    // Don't auto-login — send to Sign In with the email pre-filled.
-    window.location.assign("/login?signup=1&email=" + encodeURIComponent(email));
+    // Don't auto-login — send to Sign In with the email pre-filled (preserve the
+    // return-to-app flag so they land back in the app after signing in).
+    const ret = returnTo === "app" ? "&return=app" : "";
+    window.location.assign("/login?signup=1&email=" + encodeURIComponent(email) + ret);
   }
 
   async function handleOAuth(provider) {
     setError("");
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: window.location.origin + "/" },
+      options: { redirectTo: window.location.origin + "/" + appSuffix },
     });
     if (error) setError(error.message);
   }
@@ -87,7 +92,7 @@ export default function SignUp() {
 
       <p style={styles.footer}>
         Already have an account?{" "}
-        <span style={styles.footerLink} onClick={() => window.location.assign("/login")}>
+        <span style={styles.footerLink} onClick={() => window.location.assign("/login" + appSuffix)}>
           Sign in
         </span>
       </p>

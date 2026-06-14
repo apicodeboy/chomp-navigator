@@ -17,7 +17,7 @@ import MapFollower from './MapFollower';
 import ChomperMarker from './ChomperMarker';
 import InstructionBanner from './InstructionBanner';
 import EtaBar from './EtaBar';
-import SearchPanel from './SearchPanel';
+import SearchSheet from './SearchSheet';
 import StoreScreen from './StoreScreen';
 import ProfileScreen from './ProfileScreen';
 import SettingsModal from './SettingsModal';
@@ -215,9 +215,9 @@ export default function MapScreen() {
 
       {/* ---------- Overlays per phase ---------- */}
 
-      {/* Idle: search (hidden once a place is selected). */}
+      {/* Idle: Apple-style bottom search sheet (hidden once a place is selected). */}
       {status === 'idle' && !selectedPlace && (
-        <SearchPanel near={fix?.coord ?? null} onPick={pickPlace} />
+        <SearchSheet near={fix?.coord ?? null} onPick={pickPlace} />
       )}
 
       {/* Place selected: detail card with a Go button (no route computed yet). */}

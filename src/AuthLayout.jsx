@@ -1,12 +1,12 @@
 import { useState } from "react";
 
 // Clean, modern split auth shell: editorial image + testimonial on the left,
-// the form column on the right. Matches the Map WRLD account design.
+// the form column on the right. Matches the MAP WRLDS account design.
 
 const TESTIMONIALS = [
   {
     quote:
-      "Map WRLD makes getting anywhere feel like a game. Turn-by-turn is crisp, the character following my route is genuinely fun, and I actually look forward to my commute now.",
+      "MAP WRLDS makes getting anywhere feel like a game. Turn-by-turn is crisp, the character following my route is genuinely fun, and I actually look forward to my commute now.",
     name: "Isabella Garcia",
     title: "Daily Commuter",
     org: "San Francisco, CA",
@@ -296,7 +296,7 @@ export default function AuthLayout({ mode, heading, sub, children }) {
           <MapGrid />
           <div style={styles.imageGlow} />
           <div style={styles.brand}>
-            <span style={{ fontSize: 18 }}>✦</span> Map WRLD
+            <span style={{ fontSize: 18 }}>✦</span> MAP WRLDS
           </div>
 
           <div style={styles.quoteCard}>

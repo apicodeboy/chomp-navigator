@@ -13,28 +13,28 @@ const PUBLIC_TOKEN = process.env.MAPBOX_PUBLIC_TOKEN ?? '';
 const DOWNLOAD_TOKEN = process.env.MAPBOX_DOWNLOAD_TOKEN ?? '';
 
 const config: ExpoConfig = {
-  name: 'Map WRLD',
-  slug: 'map-wrld',
+  name: 'MAP WRLDS',
+  slug: 'map-wrlds',
   owner: 'apicodeboy',
   version: '1.0.0',
   orientation: 'portrait',
-  scheme: 'mapwrld',
+  scheme: 'mapwrlds',
   userInterfaceStyle: 'automatic',
   newArchEnabled: true,
   ios: {
     supportsTablet: true,
-    bundleIdentifier: 'com.example.mapwrld', // ⬅️ change to your own reverse-domain id
+    bundleIdentifier: 'com.example.mapwrlds', // ⬅️ change to your own reverse-domain id
     infoPlist: {
       // Required so iOS lets us read live GPS during navigation.
       NSLocationWhenInUseUsageDescription:
-        'Map WRLD uses your location to guide you turn-by-turn.',
+        'MAP WRLDS uses your location to guide you turn-by-turn.',
       NSLocationAlwaysAndWhenInUseUsageDescription:
-        'Map WRLD uses your location to keep navigating in the background.',
+        'MAP WRLDS uses your location to keep navigating in the background.',
       UIBackgroundModes: ['location'],
     },
   },
   android: {
-    package: 'com.example.mapwrld', // ⬅️ change to your own
+    package: 'com.example.mapwrlds', // ⬅️ change to your own
     permissions: [
       'ACCESS_FINE_LOCATION',
       'ACCESS_COARSE_LOCATION',
@@ -63,7 +63,7 @@ const config: ExpoConfig = {
       'expo-location',
       {
         locationAlwaysAndWhenInUsePermission:
-          'Map WRLD uses your location to guide you turn-by-turn.',
+          'MAP WRLDS uses your location to guide you turn-by-turn.',
       },
     ],
   ],

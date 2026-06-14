@@ -1,5 +1,8 @@
+import 'react-native-gesture-handler';
 import React from 'react';
-import { SafeAreaView, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import MapScreen from '@/components/MapScreen';
 import { SkinStoreProvider } from '@/store/useSkinStore';
@@ -8,21 +11,24 @@ import { SettingsProvider } from '@/store/useSettings';
 import { theme } from '@/theme';
 
 /**
- * Root. The map is full-screen; SafeAreaView keeps the top banner clear of the notch.
+ * Root. The map is full-screen. GestureHandlerRootView + SafeAreaProvider are
+ * required by @gorhom/bottom-sheet (the Apple-style search sheet).
  * (Mapbox is initialized as a side-effect of importing src/config/mapbox via MapScreen.)
  */
 export default function App() {
   return (
-    <TicketsProvider>
-      <SkinStoreProvider>
-        <SettingsProvider>
-          <SafeAreaView style={styles.fill}>
-            <StatusBar style="light" />
-            <MapScreen />
-          </SafeAreaView>
-        </SettingsProvider>
-      </SkinStoreProvider>
-    </TicketsProvider>
+    <GestureHandlerRootView style={styles.fill}>
+      <SafeAreaProvider>
+        <TicketsProvider>
+          <SkinStoreProvider>
+            <SettingsProvider>
+              <StatusBar style="light" />
+              <MapScreen />
+            </SettingsProvider>
+          </SkinStoreProvider>
+        </TicketsProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 

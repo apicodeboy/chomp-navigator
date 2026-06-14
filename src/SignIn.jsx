@@ -2,13 +2,28 @@ import { useState } from "react";
 import { supabase } from "./supabaseClient";
 import AuthLayout, { GoogleButton, AppleButton, Divider, styles } from "./AuthLayout.jsx";
 
+// The native app opens these pages with ?return=app so we can bounce back into
+// it (via the app's URL scheme) after a successful sign-in instead of landing on
+// the web Home page.
+const APP_SCHEME = "mapwrlds://";
+
 function getSignupParams() {
   const p = new URLSearchParams(window.location.search);
-  return { email: p.get("email") || "", justSignedUp: p.get("signup") === "1" };
+  return {
+    email: p.get("email") || "",
+    justSignedUp: p.get("signup") === "1",
+    returnTo: p.get("return") || "",
+  };
+}
+
+/** Where to go after auth: back into the native app, or the web Home page. */
+function destination(returnTo) {
+  return returnTo === "app" ? APP_SCHEME : "/";
 }
 
 export default function SignIn() {
   const initial = getSignupParams();
+  const appSuffix = initial.returnTo === "app" ? "?return=app" : "";
 
   const [email, setEmail] = useState(initial.email);
   const [password, setPassword] = useState("");
@@ -31,14 +46,15 @@ export default function SignIn() {
       setError("Check your email and confirm your account before signing in.");
       return;
     }
-    window.location.assign("/");
+    window.location.assign(destination(initial.returnTo));
   }
 
   async function handleOAuth(provider) {
     setError("");
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: window.location.origin + "/" },
+      // After OAuth, land on Home with the return flag so it bounces to the app.
+      options: { redirectTo: window.location.origin + "/" + appSuffix },
     });
     if (error) setError(error.message);
   }
@@ -97,7 +113,7 @@ export default function SignIn() {
 
       <p style={styles.footer}>
         Don&apos;t have an account?{" "}
-        <span style={styles.footerLink} onClick={() => window.location.assign("/signup")}>
+        <span style={styles.footerLink} onClick={() => window.location.assign("/signup" + appSuffix)}>
           Sign up
         </span>
       </p>

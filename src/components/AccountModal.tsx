@@ -38,7 +38,9 @@ export default function AccountModal({ visible, onClose }: Props) {
       Alert.alert('Sign-in not configured', 'Set WEB_AUTH_URL in your .env, then rebuild.');
       return;
     }
-    const url = WEB_AUTH_URL.replace(/\/$/, '') + path;
+    // ?return=app tells the web pages to bounce back into the app (via the
+    // mapwrlds:// scheme) after a successful sign-in.
+    const url = WEB_AUTH_URL.replace(/\/$/, '') + path + '?return=app';
     if (await Linking.canOpenURL(url)) await Linking.openURL(url);
     else Alert.alert('Could not open', url);
   }
@@ -68,7 +70,7 @@ export default function AccountModal({ visible, onClose }: Props) {
             </Text>
             <Text style={styles.sub}>
               {signedIn
-                ? 'You are signed in to your Map WRLD account.'
+                ? 'You are signed in to your MAP WRLDS account.'
                 : 'You are navigating as a guest. Sign in to sync your account.'}
             </Text>
 
