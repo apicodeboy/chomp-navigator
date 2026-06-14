@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { NAV } from '@/config/mapbox';
-import { fetchRoute } from '@/services/directions';
+import { fetchRoutes } from '@/services/directions';
 import {
   bearingAtDistance,
   buildPellets,
@@ -43,34 +43,51 @@ export function useNavigation(
   fix: UserFix | null,
   started: boolean,
 ) {
-  const [route, setRoute] = useState<NavRoute | null>(null);
+  const [routes, setRoutes] = useState<NavRoute[]>([]);
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const [pellets, setPellets] = useState<Pellet[]>([]);
   const [progress, setProgress] = useState<NavProgress | null>(null);
   const [status, setStatus] = useState<NavStatus>('idle');
   const [error, setError] = useState<string | null>(null);
 
-  // Steps with cumulative start/end distance-along-route filled in.
+  // The active route is the selected alternative.
+  const route = routes[selectedIndex] ?? null;
+
+  // Steps with cumulative start/end distance-along-route filled in (for the active route).
   const steps = useRef<RouteStep[]>([]);
   const offRouteCount = useRef(0);
   const rerouting = useRef(false);
 
   const totalM = useMemo(() => (route ? lineLengthM(route.line) : 0), [route]);
 
-  /** Load (or reload) a route from `origin` to `dest`. */
-  const loadRoute = useCallback(async (origin: Position, dest: Position) => {
-    const r = await fetchRoute(origin, dest);
-    // Assign each step a start/end distance-along-route via a cumulative sum of
-    // step lengths. The maneuver sits at startDistAlong; the step ENDS at the next
-    // maneuver (endDistAlong), which is what we count down to.
+  // Whenever the active route changes (load or alternative switch), recompute its
+  // per-step distances and pellets.
+  useEffect(() => {
+    if (!route) {
+      steps.current = [];
+      setPellets([]);
+      return;
+    }
     let cum = 0;
-    steps.current = r.steps.map((s) => {
+    steps.current = route.steps.map((s) => {
       const start = cum;
       cum += s.distance;
       return { ...s, startDistAlong: start, endDistAlong: cum };
     });
-    setRoute(r);
-    setPellets(buildPellets(r.line, NAV.PELLET_SPACING_M));
-    return r;
+    setPellets(buildPellets(route.line, NAV.PELLET_SPACING_M));
+  }, [route]);
+
+  /** Load route alternatives from `origin` to `dest`. */
+  const loadRoutes = useCallback(async (origin: Position, dest: Position) => {
+    const rs = await fetchRoutes(origin, dest);
+    setRoutes(rs);
+    setSelectedIndex(0);
+    return rs;
+  }, []);
+
+  /** Pick one of the alternatives (only meaningful during the preview step). */
+  const selectRoute = useCallback((index: number) => {
+    setSelectedIndex(index);
   }, []);
 
   // Initial route fetch when a destination is chosen (uses the current fix as origin).
@@ -79,9 +96,9 @@ export function useNavigation(
     let cancelled = false;
     setStatus('loading');
     setError(null);
-    loadRoute(fix.coord, destination)
+    loadRoutes(fix.coord, destination)
       .then(() => {
-        if (!cancelled) setStatus('preview'); // show route; wait for Start
+        if (!cancelled) setStatus('preview'); // show route options; wait for Start
       })
       .catch((e: unknown) => {
         if (cancelled) return;
@@ -93,7 +110,7 @@ export function useNavigation(
     };
     // Only re-run when the destination changes, not every fix.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [destination, loadRoute]);
+  }, [destination, loadRoutes]);
 
   // Begin live tracking when the user taps Start (route already loaded in preview).
   useEffect(() => {
@@ -117,7 +134,7 @@ export function useNavigation(
       ) {
         rerouting.current = true;
         offRouteCount.current = 0;
-        loadRoute(fix.coord, destination) // reroute from the REAL gps point
+        loadRoutes(fix.coord, destination) // reroute from the REAL gps point
           .catch((e: unknown) =>
             setError(e instanceof Error ? e.message : 'reroute failed'),
           )
@@ -158,10 +175,11 @@ export function useNavigation(
     });
 
     if (distRemaining < 15) setStatus('arrived');
-  }, [fix, route, status, totalM, destination, loadRoute]);
+  }, [fix, route, status, totalM, destination, loadRoutes]);
 
   const reset = useCallback(() => {
-    setRoute(null);
+    setRoutes([]);
+    setSelectedIndex(0);
     setPellets([]);
     setProgress(null);
     setStatus('idle');
@@ -170,5 +188,5 @@ export function useNavigation(
     offRouteCount.current = 0;
   }, []);
 
-  return { route, pellets, progress, status, error, reset };
+  return { route, routes, selectedIndex, selectRoute, pellets, progress, status, error, reset };
 }

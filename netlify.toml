@@ -1,5 +1,12 @@
-# Alternative one-shot deploy: drag this repo's `web-gl-demo/` folder onto
-# https://app.netlify.com/drop, or connect this repo — Netlify will publish it.
+# Deploys the web auth app (Sign In / Sign Up / Home) from web/.
+# Build it with Vite, publish the static output in web/dist.
 [build]
-  publish = "web-gl-demo"
-  command = ""
+  command = "npm run web:build"
+  publish = "web/dist"
+
+# SPA fallback: the app routes on the URL path (/login, /signup, /), so every
+# path must serve index.html and let the client render the right page.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

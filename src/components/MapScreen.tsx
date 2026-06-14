@@ -14,50 +14,79 @@ import { useVoiceGuidance } from '@/hooks/useVoiceGuidance';
 import RouteLayers from './RouteLayers';
 import PreviewLayer from './PreviewLayer';
 import MapFollower from './MapFollower';
+import ChomperMarker from './ChomperMarker';
 import InstructionBanner from './InstructionBanner';
 import EtaBar from './EtaBar';
 import SearchPanel from './SearchPanel';
 import StoreScreen from './StoreScreen';
 import ProfileScreen from './ProfileScreen';
+import SettingsModal from './SettingsModal';
+import AccountModal from './AccountModal';
+import FavoritesModal from './FavoritesModal';
 import TicketBalance from './TicketBalance';
 import { useSkinStore } from '@/store/useSkinStore';
 import { useMapStyle } from '@/store/useMapStyle';
 import { useTickets } from '@/store/useTickets';
+import { useSettings } from '@/store/useSettings';
+import { addFavorite, isFavorite } from '@/lib/favorites';
+import { formatDistance, formatDuration } from '@/utils/format';
+import { straightLineM } from '@/utils/geo';
 import { theme } from '@/theme';
 import type { Place } from '@/types/navigation';
-
-function fmtKm(m: number): string {
-  return m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1)} km`;
-}
-function fmtDuration(sec: number): string {
-  const mins = Math.max(1, Math.round(sec / 60));
-  return mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins} min`;
-}
 
 export default function MapScreen() {
   const { fix, permissionDenied } = useUserLocation();
   const { selected: selectedSkin } = useSkinStore();
   const { styleURL } = useMapStyle();
+  const { voiceOn, setVoiceOn, units } = useSettings();
   const tickets = useTickets();
   const cameraRef = useRef<React.ElementRef<typeof Mapbox.Camera>>(null);
   const reportedRef = useRef(false);
 
-  const [place, setPlace] = useState<Place | null>(null);
+  // selectedPlace = a place tapped in search/favorites (map hovers + shows a
+  // detail card). routingTo = the destination we actually route to, set when the
+  // user taps "Go" (then we fetch route alternatives).
+  const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
+  const [routingTo, setRoutingTo] = useState<Place | null>(null);
   const [started, setStarted] = useState(false);
   const [storeOpen, setStoreOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [voiceOn, setVoiceOn] = useState(true);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [favoritesOpen, setFavoritesOpen] = useState(false);
+  const [placeSaved, setPlaceSaved] = useState(false);
   // Chase-cam lock. The map auto-follows the character; panning releases it and
   // surfaces the Re-center button (like Apple Maps).
   const [following, setFollowing] = useState(true);
 
-  const { route, pellets, progress, status, error, reset } = useNavigation(
-    place?.coord ?? null,
-    fix,
-    started,
-  );
+  const { route, routes, selectedIndex, selectRoute, pellets, progress, status, error, reset } =
+    useNavigation(routingTo?.coord ?? null, fix, started);
 
   useVoiceGuidance(progress, status, voiceOn);
+
+  // Pick a place from search/favorites: hover the map over it and show details
+  // (no routing yet — that happens on "Go").
+  function pickPlace(p: Place) {
+    setSelectedPlace(p);
+    setRoutingTo(null);
+    setStarted(false);
+  }
+
+  // Reflect whether the selected place is already saved.
+  useEffect(() => {
+    if (selectedPlace) isFavorite(selectedPlace.id).then(setPlaceSaved);
+    else setPlaceSaved(false);
+  }, [selectedPlace]);
+
+  async function saveCurrentPlace() {
+    if (!selectedPlace) return;
+    await addFavorite(selectedPlace);
+    setPlaceSaved(true);
+  }
+
+  // Straight-line distance from the user to the selected place (cheap label).
+  const placeDistanceM =
+    selectedPlace && fix ? straightLineM(fix.coord, selectedPlace.coord) : null;
 
   // On arrival, add the trip distance to the lifetime total and report it; the
   // server credits Tickets for any newly crossed distance milestone.
@@ -86,7 +115,8 @@ export default function MapScreen() {
 
   function cancel() {
     reset();
-    setPlace(null);
+    setSelectedPlace(null);
+    setRoutingTo(null);
     setStarted(false);
   }
 
@@ -94,6 +124,22 @@ export default function MapScreen() {
   useEffect(() => {
     if (isNav) setFollowing(true);
   }, [isNav]);
+
+  // Re-center: during navigation re-lock the follow cam; otherwise snap back to
+  // the user's current location.
+  function recenter() {
+    if (isNav) {
+      setFollowing(true);
+      return;
+    }
+    if (fix) {
+      cameraRef.current?.setCamera({
+        centerCoordinate: fix.coord,
+        zoomLevel: NAV.FOLLOW_ZOOM,
+        animationDuration: 500,
+      });
+    }
+  }
 
   if (permissionDenied) {
     return (
@@ -126,12 +172,36 @@ export default function MapScreen() {
           progress={progress}
           skin={selectedSkin}
           following={following}
+          focusCoord={selectedPlace && !routingTo ? selectedPlace.coord : null}
         />
 
-        {!isNav && <Mapbox.UserLocation visible androidRenderMode="normal" />}
+        {/* Idle/preview: show the EQUIPPED character at the user's location
+            instead of the default blue dot (matches the web demo). */}
+        {!isNav && (
+          <>
+            <Mapbox.UserLocation visible={false} />
+            {fix && (
+              <ChomperMarker
+                coordinate={fix.coord}
+                rotationDeg={0}
+                skin={selectedSkin}
+                size={42}
+              />
+            )}
+          </>
+        )}
 
-        {/* Preview: full route line + endpoints. */}
-        {isPreview && route && <PreviewLayer line={route.line} />}
+        {/* Place-preview pin (before routing). */}
+        {selectedPlace && !routingTo && (
+          <Mapbox.PointAnnotation id="selected-place" coordinate={selectedPlace.coord}>
+            <View style={styles.placePin} />
+          </Mapbox.PointAnnotation>
+        )}
+
+        {/* Preview: route alternatives + endpoints. */}
+        {isPreview && routes.length > 0 && (
+          <PreviewLayer routes={routes} selectedIndex={selectedIndex} />
+        )}
 
         {/* Navigation: pellets + the chomping character. */}
         {isNav && pellets.length > 0 && progress && (
@@ -145,23 +215,72 @@ export default function MapScreen() {
 
       {/* ---------- Overlays per phase ---------- */}
 
-      {/* Idle: search. */}
-      {status === 'idle' && (
-        <SearchPanel near={fix?.coord ?? null} onPick={setPlace} />
+      {/* Idle: search (hidden once a place is selected). */}
+      {status === 'idle' && !selectedPlace && (
+        <SearchPanel near={fix?.coord ?? null} onPick={pickPlace} />
       )}
 
-      {/* Preview: route summary + Start / Cancel. */}
-      {isPreview && (
+      {/* Place selected: detail card with a Go button (no route computed yet). */}
+      {status === 'idle' && selectedPlace && (
+        <View style={styles.previewCard}>
+          <View style={styles.previewTitleRow}>
+            <Text style={styles.previewTitle} numberOfLines={1}>{selectedPlace.name}</Text>
+            <TouchableOpacity onPress={saveCurrentPlace} hitSlop={10} disabled={placeSaved}>
+              <Text style={[styles.saveStar, placeSaved && styles.saveStarOn]}>
+                {placeSaved ? '★' : '☆'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          {!!selectedPlace.address && (
+            <Text style={styles.previewAddr} numberOfLines={2}>{selectedPlace.address}</Text>
+          )}
+          {placeDistanceM != null && (
+            <Text style={styles.previewSub}>{formatDistance(placeDistanceM, units)} away</Text>
+          )}
+          <View style={styles.previewBtns}>
+            <TouchableOpacity style={styles.cancelBtn} onPress={cancel}>
+              <Text style={styles.cancelText}>Back</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.startBtn} onPress={() => setRoutingTo(selectedPlace)}>
+              <Text style={styles.startText}>Go ▶</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* Routing/preview: choose among route alternatives, then Start. */}
+      {(isPreview || status === 'error') && (
         <View style={styles.previewCard}>
           <Text style={styles.previewTitle} numberOfLines={1}>
-            {place?.name ?? 'Route'}
+            {routingTo?.name ?? selectedPlace?.name ?? 'Routes'}
           </Text>
-          {route ? (
-            <Text style={styles.previewSub}>
-              {fmtDuration(route.duration)} · {fmtKm(route.distance)} · with traffic
-            </Text>
+          {status === 'error' ? (
+            <Text style={styles.previewErr}>No route found. Try another destination.</Text>
+          ) : routes.length === 0 ? (
+            <Text style={styles.previewSub}>Finding the best routes…</Text>
           ) : (
-            <Text style={styles.previewSub}>Finding the best route…</Text>
+            <View style={styles.routeOptions}>
+              {routes.slice(0, 4).map((r, i) => {
+                const active = i === selectedIndex;
+                return (
+                  <TouchableOpacity
+                    key={i}
+                    style={[styles.routeOpt, active && styles.routeOptActive]}
+                    onPress={() => selectRoute(i)}
+                  >
+                    <Text style={[styles.routeEta, active && styles.routeEtaActive]}>
+                      {formatDuration(r.duration)}
+                    </Text>
+                    <Text style={[styles.routeDist, active && styles.routeDistActive]}>
+                      {formatDistance(r.distance, units)}
+                    </Text>
+                    <Text style={[styles.routeTag, active && styles.routeTagActive]}>
+                      {i === 0 ? 'Fastest' : `Alt ${i}`}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           )}
           <View style={styles.previewBtns}>
             <TouchableOpacity style={styles.cancelBtn} onPress={cancel}>
@@ -184,6 +303,7 @@ export default function MapScreen() {
           <InstructionBanner
             step={progress.currentStep}
             distanceM={progress.distToManeuver}
+            units={units}
           />
           {status === 'arrived' ? (
             <View style={styles.arrived}>
@@ -196,6 +316,7 @@ export default function MapScreen() {
             <EtaBar
               distRemainingM={progress.distRemaining}
               remainingSec={remainingSec}
+              units={units}
               onStop={cancel}
             />
           )}
@@ -209,33 +330,43 @@ export default function MapScreen() {
         </View>
       )}
 
-      {/* Floating controls. */}
-      <TouchableOpacity style={styles.fab} onPress={() => setStoreOpen(true)}>
+      {/* Floating controls — bottom-right stack. */}
+      <TouchableOpacity style={[styles.fab, styles.fabStore]} onPress={() => setStoreOpen(true)}>
         <Text style={styles.fabIcon}>🛒</Text>
       </TouchableOpacity>
       <TouchableOpacity style={[styles.fab, styles.fabProfile]} onPress={() => setProfileOpen(true)}>
         <Text style={styles.fabIcon}>👤</Text>
       </TouchableOpacity>
+      <TouchableOpacity style={[styles.fab, styles.fabFavorites]} onPress={() => setFavoritesOpen(true)}>
+        <Text style={styles.fabIcon}>⭐</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={[styles.fab, styles.fabSettings]} onPress={() => setSettingsOpen(true)}>
+        <Text style={styles.fabIcon}>⚙️</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={[styles.fab, styles.fabAccount]} onPress={() => setAccountOpen(true)}>
+        <Text style={styles.fabIcon}>🔑</Text>
+      </TouchableOpacity>
+      {/* Always-on re-center; highlighted when navigation has been panned away. */}
+      <TouchableOpacity
+        style={[styles.fab, styles.fabRecenter, isNav && !following && styles.fabRecenterActive]}
+        onPress={recenter}
+      >
+        <Text style={styles.fabIcon}>🧭</Text>
+      </TouchableOpacity>
       {isNav && (
         <TouchableOpacity
           style={[styles.fab, styles.fabMute]}
-          onPress={() => setVoiceOn((v) => !v)}
+          onPress={() => setVoiceOn(!voiceOn)}
         >
           <Text style={styles.fabIcon}>{voiceOn ? '🔊' : '🔇'}</Text>
-        </TouchableOpacity>
-      )}
-      {/* Re-center appears only after the user has panned away from the chase cam. */}
-      {isNav && !following && (
-        <TouchableOpacity
-          style={[styles.fab, styles.fabRecenter, styles.fabRecenterActive]}
-          onPress={() => setFollowing(true)}
-        >
-          <Text style={styles.fabIcon}>🧭</Text>
         </TouchableOpacity>
       )}
 
       <StoreScreen visible={storeOpen} onClose={() => setStoreOpen(false)} />
       <ProfileScreen visible={profileOpen} onClose={() => setProfileOpen(false)} />
+      <FavoritesModal visible={favoritesOpen} onClose={() => setFavoritesOpen(false)} onPick={pickPlace} />
+      <SettingsModal visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <AccountModal visible={accountOpen} onClose={() => setAccountOpen(false)} />
       {error && <Text style={styles.error}>{error}</Text>}
     </View>
   );
@@ -258,8 +389,41 @@ const styles = StyleSheet.create({
   msg: { color: theme.colors.textOnMap, textAlign: 'center', fontSize: 16 },
 
   previewCard: { ...card, bottom: 24, gap: 6 },
-  previewTitle: { color: theme.colors.textPrimary, fontSize: 18, fontWeight: '800' },
+  previewTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  previewTitle: { flex: 1, color: theme.colors.textPrimary, fontSize: 18, fontWeight: '800' },
+  saveStar: { color: theme.colors.textSecondary, fontSize: 26, paddingLeft: 12 },
+  saveStarOn: { color: theme.colors.accent },
   previewSub: { color: theme.colors.success, fontSize: 14, fontWeight: '600' },
+  previewAddr: { color: theme.colors.textSecondary, fontSize: 13, lineHeight: 18 },
+  previewErr: { color: theme.colors.danger, fontSize: 14, fontWeight: '600' },
+
+  routeOptions: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  routeOpt: {
+    flex: 1,
+    backgroundColor: theme.colors.cardElevated,
+    borderRadius: theme.radius.sm,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    alignItems: 'center',
+  },
+  routeOptActive: { borderColor: theme.colors.accent, backgroundColor: theme.colors.card },
+  routeEta: { color: theme.colors.textPrimary, fontSize: 16, fontWeight: '800' },
+  routeEtaActive: { color: theme.colors.textPrimary },
+  routeDist: { color: theme.colors.textSecondary, fontSize: 12, marginTop: 1 },
+  routeDistActive: { color: theme.colors.textSecondary },
+  routeTag: { color: theme.colors.textMuted, fontSize: 11, fontWeight: '700', marginTop: 3 },
+  routeTagActive: { color: theme.colors.accentStrong },
+
+  placePin: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: theme.colors.accent,
+    borderWidth: 3,
+    borderColor: '#fff',
+  },
   previewBtns: { flexDirection: 'row', gap: 10, marginTop: 12 },
   cancelBtn: { flex: 1, paddingVertical: 14, borderRadius: theme.radius.sm, backgroundColor: theme.colors.card, alignItems: 'center' },
   cancelText: { color: theme.colors.textPrimary, fontWeight: '700', fontSize: 16 },
@@ -273,7 +437,6 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: 12,
-    bottom: 110,
     width: 52,
     height: 52,
     borderRadius: theme.radius.pill,
@@ -283,10 +446,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Bottom-right vertical stack (57px pitch).
+  fabStore: { bottom: 110 },
   fabProfile: { bottom: 167 },
-  fabRecenter: { bottom: 224 },
+  fabFavorites: { bottom: 224 },
+  fabSettings: { bottom: 281 },
+  fabAccount: { bottom: 338 },
+  fabRecenter: { bottom: 395 },
   fabRecenterActive: { backgroundColor: theme.colors.accent, borderColor: theme.colors.accent },
-  fabMute: { bottom: 281 },
+  fabMute: { bottom: 452 },
   fabIcon: { fontSize: 24 },
   ticketTop: { position: 'absolute', top: 116, right: 12 },
 

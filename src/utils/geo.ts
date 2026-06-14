@@ -78,6 +78,11 @@ export function toLine(coords: Position[]): Feature<LineString> {
   return lineString(coords);
 }
 
+/** Straight-line ("as the crow flies") distance between two points, in meters. */
+export function straightLineM(a: Position, b: Position): number {
+  return length(lineString([a, b]), KM) * 1000;
+}
+
 /**
  * Bounding box of a line as { ne, sw } corners for fitting the route preview
  * into the camera (Mapbox Camera `bounds`).

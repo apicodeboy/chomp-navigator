@@ -1,25 +1,54 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import Mapbox from '@rnmapbox/maps';
+import { featureCollection } from '@turf/turf';
 import { endpoints } from '@/utils/geo';
 import { theme } from '@/theme';
-import type { Feature, LineString } from 'geojson';
+import type { NavRoute } from '@/types/navigation';
 
 interface Props {
-  line: Feature<LineString>;
+  /** All route alternatives. */
+  routes: NavRoute[];
+  /** Index of the highlighted (selected) route. */
+  selectedIndex: number;
 }
 
 /**
- * The full route drawn for the PREVIEW phase (before navigation starts):
- * a solid route line plus origin (green) and destination (red) markers.
- * Once navigating, this is replaced by the pellet line in RouteLayers.
+ * The route preview (before navigation starts): alternative routes drawn dimmed
+ * underneath, the selected route highlighted on top, plus origin (green) and
+ * destination (yellow) markers. Once navigating, this is replaced by the pellet
+ * line in RouteLayers.
  */
-export default function PreviewLayer({ line }: Props) {
-  const { origin, destination } = endpoints(line);
+export default function PreviewLayer({ routes, selectedIndex }: Props) {
+  const selected = routes[selectedIndex];
+  if (!selected) return null;
+
+  const alternatives = routes.filter((_, i) => i !== selectedIndex);
+  const { origin, destination } = endpoints(selected.line);
+
   return (
     <>
-      <Mapbox.ShapeSource id="preview-route" shape={line}>
-        {/* Casing underneath for contrast, then the colored route on top. */}
+      {/* Dimmed alternatives underneath. */}
+      {alternatives.length > 0 && (
+        <Mapbox.ShapeSource
+          id="preview-alts"
+          shape={featureCollection(alternatives.map((r) => r.line))}
+        >
+          <Mapbox.LineLayer
+            id="preview-alts-line"
+            style={{
+              lineColor: theme.colors.textSecondary,
+              lineWidth: 5,
+              lineOpacity: 0.6,
+              lineCap: 'round',
+              lineJoin: 'round',
+            }}
+          />
+        </Mapbox.ShapeSource>
+      )}
+
+      {/* Selected route on top: casing for contrast, then the accent line. */}
+      <Mapbox.ShapeSource id="preview-route" shape={selected.line}>
         <Mapbox.LineLayer
           id="preview-casing"
           style={{
@@ -32,7 +61,7 @@ export default function PreviewLayer({ line }: Props) {
         <Mapbox.LineLayer
           id="preview-line"
           style={{
-            lineColor: theme.colors.accentStrong,
+            lineColor: theme.colors.accent,
             lineWidth: 5,
             lineCap: 'round',
             lineJoin: 'round',

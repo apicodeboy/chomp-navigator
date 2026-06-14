@@ -51,26 +51,8 @@ interface DirectionsResponse {
  * Profile note: defaults to `driving-traffic` for live traffic-aware durations
  * (ETAs reflect current congestion). Use `driving` to avoid traffic rate limits.
  */
-export async function fetchRoute(
-  origin: Position,
-  destination: Position,
-  profile: 'driving' | 'driving-traffic' | 'walking' | 'cycling' = 'driving-traffic',
-): Promise<NavRoute> {
-  const coords = `${origin[0]},${origin[1]};${destination[0]},${destination[1]}`;
-  const url =
-    `${DIRECTIONS}/${profile}/${coords}` +
-    `?alternatives=false&geometries=geojson&overview=full&steps=true` +
-    `&voice_instructions=true&banner_instructions=true&voice_units=metric` +
-    `&access_token=${MAPBOX_PUBLIC_TOKEN}`;
-
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Directions HTTP ${res.status}`);
-  const data = (await res.json()) as DirectionsResponse;
-  if (data.code !== 'Ok' || !data.routes.length) {
-    throw new Error(`Directions error: ${data.code}`);
-  }
-
-  const r = data.routes[0];
+/** Parse one Directions API route into our NavRoute shape. */
+function parseRoute(r: DirectionsResponse['routes'][number]): NavRoute {
   // Flatten legs→steps; startDistAlong/endDistAlong are filled later in useNavigation
   // once we know cumulative distances along the whole route.
   const steps: RouteStep[] = r.legs.flatMap((leg) =>
@@ -86,13 +68,49 @@ export async function fetchRoute(
       endDistAlong: 0,
     })),
   );
-
   return {
     line: toLine(r.geometry.coordinates),
     distance: r.distance,
     duration: r.duration,
     steps,
   };
+}
+
+/**
+ * Fetch driving route ALTERNATIVES between two [lng, lat] points.
+ *
+ * `alternatives=true` asks Mapbox for multiple distinct routes (Mapbox returns up
+ * to 3 total — the fastest plus up to 2 alternatives). The first is the
+ * recommended/fastest. Used for the Apple-Maps-style "pick a route" step.
+ */
+export async function fetchRoutes(
+  origin: Position,
+  destination: Position,
+  profile: 'driving' | 'driving-traffic' | 'walking' | 'cycling' = 'driving-traffic',
+): Promise<NavRoute[]> {
+  const coords = `${origin[0]},${origin[1]};${destination[0]},${destination[1]}`;
+  const url =
+    `${DIRECTIONS}/${profile}/${coords}` +
+    `?alternatives=true&geometries=geojson&overview=full&steps=true` +
+    `&voice_instructions=true&banner_instructions=true&voice_units=metric` +
+    `&access_token=${MAPBOX_PUBLIC_TOKEN}`;
+
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Directions HTTP ${res.status}`);
+  const data = (await res.json()) as DirectionsResponse;
+  if (data.code !== 'Ok' || !data.routes.length) {
+    throw new Error(`Directions error: ${data.code}`);
+  }
+  return data.routes.map(parseRoute);
+}
+
+/** Fetch a single (fastest) route — convenience wrapper over fetchRoutes. */
+export async function fetchRoute(
+  origin: Position,
+  destination: Position,
+  profile: 'driving' | 'driving-traffic' | 'walking' | 'cycling' = 'driving-traffic',
+): Promise<NavRoute> {
+  return (await fetchRoutes(origin, destination, profile))[0];
 }
 
 /** Shape of the Geocoding v6 feature fields we read. */

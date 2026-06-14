@@ -1,17 +1,14 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { formatDistance, type Units } from '@/utils/format';
 import { theme } from '@/theme';
 
 interface Props {
   distRemainingM: number;
   /** Remaining travel time in seconds (from Mapbox's traffic-aware duration). */
   remainingSec: number;
+  units: Units;
   onStop: () => void;
-}
-
-function fmtDist(m: number): string {
-  if (m < 1000) return `${Math.round(m / 10) * 10} m`;
-  return `${(m / 1000).toFixed(1)} km`;
 }
 
 function fmtEta(remainingSec: number): string {
@@ -24,12 +21,12 @@ function fmtEta(remainingSec: number): string {
 }
 
 /** Bottom bar: traffic-aware ETA, distance remaining, and a stop button. */
-export default function EtaBar({ distRemainingM, remainingSec, onStop }: Props) {
+export default function EtaBar({ distRemainingM, remainingSec, units, onStop }: Props) {
   return (
     <View style={styles.wrap}>
       <View>
         <Text style={styles.eta}>{fmtEta(remainingSec)}</Text>
-        <Text style={styles.sub}>{fmtDist(distRemainingM)} remaining</Text>
+        <Text style={styles.sub}>{formatDistance(distRemainingM, units)} remaining</Text>
       </View>
       <TouchableOpacity onPress={onStop} hitSlop={10}>
         <Text style={styles.stop}>✕ End</Text>

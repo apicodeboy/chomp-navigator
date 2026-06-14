@@ -1,11 +1,13 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { formatDistance, type Units } from '@/utils/format';
 import { theme } from '@/theme';
 import type { BannerInstruction, RouteStep } from '@/types/navigation';
 
 interface Props {
   step: RouteStep | null;
   distanceM: number;
+  units: Units;
 }
 
 /**
@@ -40,13 +42,8 @@ function arrowFor(type?: string, modifier?: string): string {
   return '↑';
 }
 
-function fmtDist(m: number): string {
-  if (m < 1000) return `${Math.round(m / 10) * 10} m`;
-  return `${(m / 1000).toFixed(1)} km`;
-}
-
 /** Top banner: maneuver arrow + instruction text + distance to it. */
-export default function InstructionBanner({ step, distanceM }: Props) {
+export default function InstructionBanner({ step, distanceM, units }: Props) {
   const banner = activeBanner(step, distanceM);
   // Prefer Mapbox's banner text; fall back to the step's maneuver instruction.
   const text = banner?.primary.text ?? step?.instruction ?? 'Head to your route';
@@ -57,7 +54,7 @@ export default function InstructionBanner({ step, distanceM }: Props) {
     <View style={styles.wrap} pointerEvents="none">
       <Text style={styles.arrow}>{arrowFor(type, modifier)}</Text>
       <View style={styles.textCol}>
-        <Text style={styles.dist}>{fmtDist(distanceM)}</Text>
+        <Text style={styles.dist}>{formatDistance(distanceM, units)}</Text>
         <Text style={styles.instruction} numberOfLines={2}>
           {text}
         </Text>

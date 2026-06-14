@@ -18,6 +18,9 @@ interface Props {
   /** When false (user panned away), the character keeps moving but the camera
    * stays put until they tap Re-center. */
   following: boolean;
+  /** When set (a place is selected but not yet routing), the camera hovers over
+   * this coordinate instead of following the user — Apple-Maps place preview. */
+  focusCoord?: Position | null;
 }
 
 // How aggressively the displayed position chases the GPS-derived estimate.
@@ -52,6 +55,7 @@ export default function MapFollower({
   progress,
   skin,
   following,
+  focusCoord,
 }: Props) {
   const sampler = useMemo(() => (route ? makeRouteSampler(route.line) : null), [route]);
 
@@ -159,15 +163,22 @@ export default function MapFollower({
           bounds: {
             ...routeBounds(route.line),
             paddingTop: 120,
-            paddingBottom: 220,
+            paddingBottom: 260,
             paddingLeft: 60,
             paddingRight: 60,
           },
           animationDuration: 600,
         }
-      : !isNav
-        ? { followUserLocation: true, followZoomLevel: NAV.FOLLOW_ZOOM }
-        : {};
+      : !isNav && focusCoord
+        ? {
+            // Hover over the selected place (place-preview step).
+            centerCoordinate: focusCoord,
+            zoomLevel: 15,
+            animationDuration: 600,
+          }
+        : !isNav
+          ? { followUserLocation: true, followZoomLevel: NAV.FOLLOW_ZOOM }
+          : {};
 
   return (
     <>

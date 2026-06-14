@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import MapScreen from '@/components/MapScreen';
 import { SkinStoreProvider } from '@/store/useSkinStore';
 import { TicketsProvider } from '@/store/useTickets';
+import { SettingsProvider } from '@/store/useSettings';
 import { theme } from '@/theme';
 
 /**
@@ -14,10 +15,12 @@ export default function App() {
   return (
     <TicketsProvider>
       <SkinStoreProvider>
-        <SafeAreaView style={styles.fill}>
-          <StatusBar style="light" />
-          <MapScreen />
-        </SafeAreaView>
+        <SettingsProvider>
+          <SafeAreaView style={styles.fill}>
+            <StatusBar style="light" />
+            <MapScreen />
+          </SafeAreaView>
+        </SettingsProvider>
       </SkinStoreProvider>
     </TicketsProvider>
   );
