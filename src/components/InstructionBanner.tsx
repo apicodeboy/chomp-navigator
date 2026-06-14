@@ -76,8 +76,8 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
     gap: 14,
   },
-  arrow: { color: theme.colors.textPrimary, fontSize: 40, fontWeight: '800', width: 48, textAlign: 'center' },
+  arrow: { color: theme.colors.textPrimary, fontSize: 44, fontWeight: '800', width: 52, textAlign: 'center' },
   textCol: { flex: 1 },
-  dist: { color: theme.colors.textPrimary, fontSize: 22, fontWeight: '800' },
-  instruction: { color: theme.colors.textPrimary, fontSize: 15, marginTop: 2 },
+  dist: { color: theme.colors.textPrimary, fontSize: 38, fontWeight: '900', letterSpacing: -0.5 },
+  instruction: { color: theme.colors.textPrimary, fontSize: 16, fontWeight: '600', marginTop: 2 },
 });

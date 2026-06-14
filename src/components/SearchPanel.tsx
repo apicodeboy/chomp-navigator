@@ -1,35 +1,96 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
+  Image,
+  Keyboard,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { geocodeSuggestions } from '@/services/directions';
+import { categorySearch, geocodeSuggestions } from '@/services/directions';
+import { addFavorite, getFavorites, removeFavorite } from '@/lib/favorites';
+import { straightLineM } from '@/utils/geo';
+import { formatDistance } from '@/utils/format';
 import { theme } from '@/theme';
 import type { Place } from '@/types/navigation';
 import type { Position } from 'geojson';
 
+const PROFILE_ICON = require('../../assets/icon-profile.png');
+
 interface Props {
-  /** User location to bias suggestions toward. */
   near: Position | null;
-  /** Called when a suggestion is chosen. */
   onPick: (place: Place) => void;
+  /** When provided, the profile chip is shown on the right end of the bar. */
+  onOpenProfile?: () => void;
+  /** Report the bar's height + keyboard state so callers can float buttons above it. */
+  onLayoutChange?: (info: { height: number; keyboardOpen: boolean }) => void;
 }
 
+// Suggested "keywords" — Search Box canonical categories + a color tint each.
+const CHIPS: { cat: string; label: string; tint: string }[] = [
+  { cat: 'restaurant', label: 'Food', tint: 'rgba(96,165,250,0.22)' },
+  { cat: 'gas_station', label: 'Gas', tint: 'rgba(251,191,36,0.22)' },
+  { cat: 'coffee', label: 'Coffee', tint: 'rgba(167,139,250,0.22)' },
+  { cat: 'grocery', label: 'Groceries', tint: 'rgba(34,197,94,0.22)' },
+  { cat: 'hotel', label: 'Hotels', tint: 'rgba(244,114,182,0.22)' },
+  { cat: 'parking', label: 'Parking', tint: 'rgba(56,189,248,0.22)' },
+  { cat: 'ev_charging_station', label: 'EV', tint: 'rgba(45,212,191,0.22)' },
+  { cat: 'pharmacy', label: 'Pharmacy', tint: 'rgba(248,113,113,0.22)' },
+];
+
 /**
- * "Where to?" search with debounced live suggestions from the Geocoding v6 API.
- * Typing fires a geocode (300ms debounce); tapping a row picks the destination.
+ * Bottom search bar (dark version of the reference design): a rounded input with
+ * the profile chip on the right end, and a "Suggested" keyword-chip row above it.
+ * Lifts above the keyboard while typing.
  */
-export default function SearchPanel({ near, onPick }: Props) {
+export default function SearchPanel({ near, onPick, onOpenProfile, onLayoutChange }: Props) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Place[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showSuggest, setShowSuggest] = useState(true);
+  const [kb, setKb] = useState(0);
+  const [starred, setStarred] = useState<Set<string>>(new Set());
+  const [cardHeight, setCardHeight] = useState(150);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Lift the bar above the keyboard.
+  useEffect(() => {
+    const s = Keyboard.addListener('keyboardWillShow', (e) => setKb(e.endCoordinates.height));
+    const h = Keyboard.addListener('keyboardWillHide', () => setKb(0));
+    return () => {
+      s.remove();
+      h.remove();
+    };
+  }, []);
+
+  // Load which places are already starred.
+  useEffect(() => {
+    getFavorites().then((f) => setStarred(new Set(f.map((x) => x.id))));
+  }, []);
+
+  // Report size + keyboard state up so the floating buttons can sit above the bar.
+  useEffect(() => {
+    onLayoutChange?.({ height: cardHeight, keyboardOpen: kb > 0 });
+  }, [cardHeight, kb, onLayoutChange]);
+
+  async function toggleStar(p: Place) {
+    if (starred.has(p.id)) {
+      await removeFavorite(p.id);
+      setStarred((prev) => {
+        const next = new Set(prev);
+        next.delete(p.id);
+        return next;
+      });
+    } else {
+      await addFavorite(p);
+      setStarred((prev) => new Set(prev).add(p.id));
+    }
+  }
+
+  // Debounced autocomplete.
   useEffect(() => {
     if (timer.current) clearTimeout(timer.current);
     if (query.trim().length < 3) {
@@ -37,7 +98,6 @@ export default function SearchPanel({ near, onPick }: Props) {
       return;
     }
     setLoading(true);
-    // Debounce so we don't geocode on every keystroke.
     timer.current = setTimeout(async () => {
       try {
         setResults(await geocodeSuggestions(query, near ?? undefined));
@@ -46,84 +106,177 @@ export default function SearchPanel({ near, onPick }: Props) {
       } finally {
         setLoading(false);
       }
-    }, 300);
+    }, 250);
     return () => {
       if (timer.current) clearTimeout(timer.current);
     };
   }, [query, near]);
 
-  return (
-    <View style={styles.wrap}>
-      <View style={styles.inputRow}>
-        <Text style={styles.icon}>🔍</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Where to?"
-          placeholderTextColor={theme.colors.textSecondary}
-          value={query}
-          onChangeText={setQuery}
-          autoCorrect={false}
-        />
-        {loading && <ActivityIndicator color={theme.colors.textSecondary} />}
-      </View>
+  function pick(p: Place) {
+    Keyboard.dismiss();
+    setQuery('');
+    setResults([]);
+    onPick(p);
+  }
 
-      {results.length > 0 && (
-        <FlatList
-          style={styles.list}
-          data={results}
-          keyExtractor={(p) => p.id}
-          keyboardShouldPersistTaps="handled"
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.row}
-              onPress={() => {
-                setQuery(item.name);
-                setResults([]);
-                onPick(item);
-              }}
+  async function runCategory(cat: string, label: string) {
+    setLoading(true);
+    try {
+      // Within 20 miles, nearest first.
+      setResults(await categorySearch(cat, near ?? undefined, 20));
+      setQuery(label);
+    } catch {
+      setResults([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const showResults = results.length > 0;
+  const showChips = !showResults && showSuggest;
+  function distLabel(p: Place): string {
+    return near ? formatDistance(straightLineM(near, p.coord), 'mi') : '';
+  }
+
+  return (
+    <View style={[styles.wrap, { bottom: 16 + kb }]}>
+      <View style={styles.card} onLayout={(e) => setCardHeight(e.nativeEvent.layout.height)}>
+        {/* Results (when typing or after a category search) */}
+        {results.length > 0 && (
+          <ScrollView style={styles.results} keyboardShouldPersistTaps="handled">
+            {results.map((r) => (
+              <View key={r.id} style={styles.resRow}>
+                <TouchableOpacity style={styles.resMain} activeOpacity={0.7} onPress={() => pick(r)}>
+                  <Text style={styles.resName} numberOfLines={1}>{r.name}</Text>
+                  <Text style={styles.resAddr} numberOfLines={1}>
+                    {distLabel(r) ? `${distLabel(r)} · ${r.address}` : r.address}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => toggleStar(r)} hitSlop={10} style={styles.starBtn}>
+                  <Text style={[styles.star, starred.has(r.id) && styles.starOn]}>
+                    {starred.has(r.id) ? '★' : '☆'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </ScrollView>
+        )}
+
+        {/* Suggested keyword chips (when there are no results) */}
+        {showChips && (
+          <View style={styles.suggest}>
+            <View style={styles.suggestHead}>
+              <Text style={styles.suggestLabel} numberOfLines={1}>
+                Suggested: tap a category to search nearby
+              </Text>
+              <TouchableOpacity onPress={() => setShowSuggest(false)} hitSlop={10}>
+                <Text style={styles.x}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.chips}
             >
-              <Text style={styles.name} numberOfLines={1}>
-                {item.name}
-              </Text>
-              <Text style={styles.addr} numberOfLines={1}>
-                {item.address}
-              </Text>
-            </TouchableOpacity>
+              {CHIPS.map((c) => (
+                <TouchableOpacity
+                  key={c.cat}
+                  style={[styles.chip, { backgroundColor: c.tint }]}
+                  onPress={() => runCategory(c.cat, c.label)}
+                >
+                  <Text style={styles.chipText}>{c.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {(showResults || showChips) && <View style={styles.hr} />}
+
+        {/* Input bar with profile on the right end */}
+        <View style={styles.inputBar}>
+          <TextInput
+            style={styles.input}
+            placeholder="Search Maps"
+            placeholderTextColor="rgba(255,255,255,0.45)"
+            value={query}
+            onChangeText={setQuery}
+            onFocus={() => setShowSuggest(true)}
+            autoCorrect={false}
+            returnKeyType="search"
+          />
+          {loading ? (
+            <ActivityIndicator color="rgba(255,255,255,0.6)" />
+          ) : (
+            <Text style={styles.mag}>🔍</Text>
           )}
-        />
-      )}
+          {onOpenProfile && (
+            <>
+              <View style={styles.vdivider} />
+              <TouchableOpacity onPress={onOpenProfile} style={styles.profileBtn} hitSlop={6}>
+                <Image source={PROFILE_ICON} style={styles.profileImg} resizeMode="contain" />
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { position: 'absolute', top: 56, left: 12, right: 12 },
-  inputRow: {
+  wrap: { position: 'absolute', left: 12, right: 12 },
+  card: {
+    backgroundColor: 'rgba(16,16,20,0.97)',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  results: { maxHeight: 240 },
+  resRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.card,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.radius.md,
-    paddingHorizontal: 14,
-    gap: 10,
-  },
-  icon: { fontSize: 16 },
-  input: { flex: 1, color: theme.colors.textPrimary, paddingVertical: 14, fontSize: 16 },
-  list: {
-    marginTop: 8,
-    backgroundColor: theme.colors.card,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.radius.md,
-    maxHeight: 280,
-  },
-  row: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 11,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: theme.colors.border,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
   },
-  name: { color: theme.colors.textPrimary, fontSize: 16, fontWeight: '600' },
-  addr: { color: theme.colors.textSecondary, fontSize: 13, marginTop: 2 },
+  resMain: { flex: 1, paddingRight: 10 },
+  resName: { color: '#ffffff', fontSize: 16, fontWeight: '600' },
+  resAddr: { color: 'rgba(255,255,255,0.55)', fontSize: 13, marginTop: 2 },
+  starBtn: { padding: 4 },
+  star: { fontSize: 22, color: 'rgba(255,255,255,0.4)' },
+  starOn: { color: theme.colors.accent },
+
+  suggest: { paddingTop: 6 },
+  suggestHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 8,
+    marginBottom: 8,
+  },
+  suggestLabel: { flex: 1, color: 'rgba(255,255,255,0.5)', fontSize: 12.5 },
+  x: { color: 'rgba(255,255,255,0.5)', fontSize: 14, paddingLeft: 10 },
+  chips: { paddingHorizontal: 6, gap: 8, paddingBottom: 4 },
+  chip: {
+    paddingVertical: 9,
+    paddingHorizontal: 16,
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  chipText: { color: '#ffffff', fontSize: 14, fontWeight: '600' },
+
+  hr: { height: 1, backgroundColor: 'rgba(255,255,255,0.09)', marginVertical: 6, marginHorizontal: 4 },
+
+  inputBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4 },
+  input: { flex: 1, color: '#ffffff', fontSize: 17, paddingVertical: 10 },
+  mag: { fontSize: 16, color: 'rgba(255,255,255,0.6)', paddingHorizontal: 6 },
+  vdivider: { width: 1, height: 26, backgroundColor: 'rgba(255,255,255,0.18)', marginHorizontal: 8 },
+  profileBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  profileImg: { width: 34, height: 34 },
 });

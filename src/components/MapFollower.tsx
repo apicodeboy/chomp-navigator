@@ -184,7 +184,7 @@ export default function MapFollower({
     <>
       <Mapbox.Camera ref={cameraRef} {...cameraProps} />
       {isNav && marker && (
-        <ChomperMarker coordinate={marker.position} rotationDeg={0} skin={skin} />
+        <ChomperMarker coordinate={marker.position} rotationDeg={0} skin={skin} size={115} />
       )}
     </>
   );

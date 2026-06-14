@@ -9,8 +9,10 @@ interface Props {
   onClose: () => void;
 }
 
+const LINE_COLORS = ['#ffc400', '#3b82f6', '#22c55e', '#ef4444', '#a855f7', '#06b6d4', '#f97316', '#ffffff'];
+
 export default function SettingsModal({ visible, onClose }: Props) {
-  const { voiceOn, setVoiceOn, units, setUnits } = useSettings();
+  const { voiceOn, setVoiceOn, units, setUnits, lineColor, setLineColor } = useSettings();
   const { styles: mapStyles, selectedId, select } = useMapStyle();
 
   return (
@@ -48,6 +50,20 @@ export default function SettingsModal({ visible, onClose }: Props) {
                       {u === 'mi' ? 'Miles' : 'Kilometers'}
                     </Text>
                   </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <Text style={styles.section}>Route Line Color</Text>
+            <View style={styles.swatchRow}>
+              {LINE_COLORS.map((c) => {
+                const active = lineColor.toLowerCase() === c.toLowerCase();
+                return (
+                  <TouchableOpacity
+                    key={c}
+                    style={[styles.swatch, { backgroundColor: c }, active && styles.swatchActive]}
+                    onPress={() => setLineColor(c)}
+                  />
                 );
               })}
             </View>
@@ -98,6 +114,15 @@ const styles = StyleSheet.create({
   },
   rowLabel: { color: theme.colors.textPrimary, fontSize: 16, fontWeight: '600' },
   section: { color: theme.colors.textPrimary, fontSize: 18, fontWeight: '800', marginTop: 22, marginBottom: 10 },
+  swatchRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  swatch: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: theme.colors.border,
+  },
+  swatchActive: { borderWidth: 3, borderColor: theme.colors.textPrimary },
   segment: { flexDirection: 'row', backgroundColor: theme.colors.cardElevated, borderRadius: theme.radius.md, padding: 4, gap: 4 },
   segBtn: { flex: 1, paddingVertical: 12, borderRadius: theme.radius.sm, alignItems: 'center' },
   segBtnActive: { backgroundColor: theme.colors.accent },

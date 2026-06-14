@@ -11,6 +11,8 @@ interface Props {
   routes: NavRoute[];
   /** Index of the highlighted (selected) route. */
   selectedIndex: number;
+  /** Selected-route line color (from Settings). */
+  color: string;
 }
 
 /**
@@ -19,7 +21,7 @@ interface Props {
  * destination (yellow) markers. Once navigating, this is replaced by the pellet
  * line in RouteLayers.
  */
-export default function PreviewLayer({ routes, selectedIndex }: Props) {
+export default function PreviewLayer({ routes, selectedIndex, color }: Props) {
   const selected = routes[selectedIndex];
   if (!selected) return null;
 
@@ -61,7 +63,7 @@ export default function PreviewLayer({ routes, selectedIndex }: Props) {
         <Mapbox.LineLayer
           id="preview-line"
           style={{
-            lineColor: theme.colors.accent,
+            lineColor: color,
             lineWidth: 5,
             lineCap: 'round',
             lineJoin: 'round',

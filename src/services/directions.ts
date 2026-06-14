@@ -1,5 +1,5 @@
 import { MAPBOX_PUBLIC_TOKEN } from '@/config/mapbox';
-import { toLine } from '@/utils/geo';
+import { straightLineM, toLine } from '@/utils/geo';
 import type {
   BannerInstruction,
   NavRoute,
@@ -12,6 +12,9 @@ import type { Position } from 'geojson';
 const DIRECTIONS = 'https://api.mapbox.com/directions/v5/mapbox';
 // Current Geocoding API is v6 (the v5 mapbox.places endpoint is legacy).
 const GEOCODE = 'https://api.mapbox.com/search/geocode/v6/forward';
+// Search Box API — POI category search ("all gas stations near me").
+const SEARCHBOX = 'https://api.mapbox.com/search/searchbox/v1';
+const MILE_M = 1609.34;
 
 /** Minimal shape of the bits of the Directions response we use. */
 interface DirectionsResponse {
@@ -154,4 +157,68 @@ export async function geocodeSuggestions(
       f.properties.full_address ?? f.properties.place_formatted ?? '',
     coord: f.geometry.coordinates,
   }));
+}
+
+interface SearchBoxFeature {
+  geometry?: { coordinates?: Position };
+  properties?: {
+    mapbox_id?: string;
+    name?: string;
+    full_address?: string;
+    address?: string;
+    place_formatted?: string;
+  };
+}
+
+/**
+ * POI category search (Food, Gas, Coffee, …) near the user. Returns only places
+ * within `maxMiles`, ordered nearest → furthest. Falls back to a geocoding search
+ * if the category endpoint returns nothing. Uses the same public token.
+ */
+export async function categorySearch(
+  category: string,
+  near?: Position,
+  maxMiles = 20,
+): Promise<Place[]> {
+  let places: Place[] = [];
+  try {
+    const proximity = near ? `&proximity=${near[0]},${near[1]}` : '';
+    const url =
+      `${SEARCHBOX}/category/${encodeURIComponent(category)}` +
+      `?limit=25${proximity}&access_token=${MAPBOX_PUBLIC_TOKEN}`;
+    const res = await fetch(url);
+    if (res.ok) {
+      const data = (await res.json()) as { features?: SearchBoxFeature[] };
+      places = (data.features ?? [])
+        .filter((f) => Array.isArray(f.geometry?.coordinates))
+        .map((f, i) => ({
+          id: f.properties?.mapbox_id ?? `cat-${i}`,
+          name: f.properties?.name ?? 'Place',
+          address:
+            f.properties?.full_address ??
+            f.properties?.address ??
+            f.properties?.place_formatted ??
+            '',
+          coord: f.geometry!.coordinates as Position,
+        }));
+    }
+  } catch {
+    places = [];
+  }
+
+  // Fallback: plain keyword geocode if the category endpoint had nothing.
+  if (places.length === 0) {
+    places = await geocodeSuggestions(category.replace(/_/g, ' '), near, 10);
+  }
+
+  // Within radius, nearest first.
+  if (near) {
+    const max = maxMiles * MILE_M;
+    places = places
+      .map((p) => ({ p, d: straightLineM(near, p.coord) }))
+      .filter((x) => x.d <= max)
+      .sort((a, b) => a.d - b.d)
+      .map((x) => x.p);
+  }
+  return places;
 }

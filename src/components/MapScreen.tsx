@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  Image,
   Share,
   StyleSheet,
   Text,
@@ -12,12 +13,13 @@ import { NAV } from '@/config/mapbox';
 import { useUserLocation } from '@/hooks/useUserLocation';
 import { useNavigation } from '@/hooks/useNavigation';
 import { useVoiceGuidance } from '@/hooks/useVoiceGuidance';
-import RouteLayers from './RouteLayers';
+import RouteLine from './RouteLine';
 import PreviewLayer from './PreviewLayer';
 import MapFollower from './MapFollower';
 import ChomperMarker from './ChomperMarker';
 import InstructionBanner from './InstructionBanner';
 import NavPanel from './NavPanel';
+import GoldButton from './GoldButton';
 import SearchPanel from './SearchPanel';
 import StoreScreen from './StoreScreen';
 import ProfileScreen from './ProfileScreen';
@@ -36,11 +38,16 @@ import { theme } from '@/theme';
 import type { Place } from '@/types/navigation';
 import type { Position } from 'geojson';
 
+const ICON_RECENTER = require('../../assets/icon-recenter.png');
+const ICON_OVERVIEW = require('../../assets/icon-overview.png');
+const ICON_PROFILE = require('../../assets/icon-profile.png');
+const ICON_STORE = require('../../assets/icon-store.png');
+
 export default function MapScreen() {
   const { fix, permissionDenied } = useUserLocation();
   const { selected: selectedSkin } = useSkinStore();
   const { styleURL } = useMapStyle();
-  const { voiceOn, setVoiceOn, units } = useSettings();
+  const { voiceOn, setVoiceOn, units, lineColor } = useSettings();
   const tickets = useTickets();
   const cameraRef = useRef<React.ElementRef<typeof Mapbox.Camera>>(null);
   const reportedRef = useRef(false);
@@ -62,6 +69,8 @@ export default function MapScreen() {
   // Chase-cam lock. The map auto-follows the character; panning releases it and
   // surfaces the Re-center button (like Apple Maps).
   const [following, setFollowing] = useState(true);
+  // Reported by the bottom search bar so the idle buttons float just above it.
+  const [searchInfo, setSearchInfo] = useState({ height: 150, keyboardOpen: false });
 
   const { route, routes, selectedIndex, selectRoute, pellets, progress, status, error, reset } =
     useNavigation(routingTo?.coord ?? null, fix, started, waypoints);
@@ -131,26 +140,31 @@ export default function MapScreen() {
   const inRoute = selectedPlace !== null || isPreview || isNav;
 
   // Overview: release follow and frame the whole route (or the selected place).
+  // The frame is deferred so the chase-cam loop sees following=false and stops
+  // driving the camera first — otherwise it overrides us on the next frame.
   function overview() {
     setFollowing(false);
-    if (route) {
-      cameraRef.current?.setCamera({
-        bounds: {
-          ...routeBounds(route.line),
-          paddingTop: 120,
-          paddingBottom: 260,
-          paddingLeft: 60,
-          paddingRight: 60,
-        },
-        animationDuration: 500,
-      });
-    } else if (selectedPlace) {
-      cameraRef.current?.setCamera({
-        centerCoordinate: selectedPlace.coord,
-        zoomLevel: 14,
-        animationDuration: 500,
-      });
-    }
+    const apply = () => {
+      if (route) {
+        cameraRef.current?.setCamera({
+          bounds: {
+            ...routeBounds(route.line),
+            paddingTop: 140,
+            paddingBottom: 280,
+            paddingLeft: 60,
+            paddingRight: 60,
+          },
+          animationDuration: 500,
+        });
+      } else if (selectedPlace) {
+        cameraRef.current?.setCamera({
+          centerCoordinate: selectedPlace.coord,
+          zoomLevel: 14,
+          animationDuration: 500,
+        });
+      }
+    };
+    requestAnimationFrame(() => requestAnimationFrame(apply));
   }
 
   async function shareEta() {
@@ -234,7 +248,7 @@ export default function MapScreen() {
                 coordinate={fix.coord}
                 rotationDeg={0}
                 skin={selectedSkin}
-                size={42}
+                size={105}
               />
             )}
           </>
@@ -249,24 +263,23 @@ export default function MapScreen() {
 
         {/* Preview: route alternatives + endpoints. */}
         {isPreview && routes.length > 0 && (
-          <PreviewLayer routes={routes} selectedIndex={selectedIndex} />
+          <PreviewLayer routes={routes} selectedIndex={selectedIndex} color={lineColor} />
         )}
 
-        {/* Navigation: pellets + the chomping character. */}
-        {isNav && pellets.length > 0 && progress && (
-          <RouteLayers
-            pellets={pellets}
-            distAlong={progress.distAlong}
-            leadM={NAV.PELLET_LEAD_M}
-          />
-        )}
+        {/* Navigation: solid route line (color from Settings) + character. */}
+        {isNav && route && <RouteLine line={route.line} color={lineColor} />}
       </Mapbox.MapView>
 
       {/* ---------- Overlays per phase ---------- */}
 
-      {/* Idle: search (hidden once a place is selected). */}
+      {/* Idle: bottom search bar with the profile chip on its right end. */}
       {status === 'idle' && !selectedPlace && (
-        <SearchPanel near={fix?.coord ?? null} onPick={pickPlace} />
+        <SearchPanel
+          near={fix?.coord ?? null}
+          onPick={pickPlace}
+          onOpenProfile={() => setProfileOpen(true)}
+          onLayoutChange={setSearchInfo}
+        />
       )}
 
       {/* Place selected: detail card with a Go button (no route computed yet). */}
@@ -287,12 +300,10 @@ export default function MapScreen() {
             <Text style={styles.previewSub}>{formatDistance(placeDistanceM, units)} away</Text>
           )}
           <View style={styles.previewBtns}>
-            <TouchableOpacity style={styles.cancelBtn} onPress={cancel}>
+            <TouchableOpacity style={styles.cancelBtn} activeOpacity={0.55} onPress={cancel}>
               <Text style={styles.cancelText}>Back</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.startBtn} onPress={() => setRoutingTo(selectedPlace)}>
-              <Text style={styles.startText}>Go ▶</Text>
-            </TouchableOpacity>
+            <GoldButton label="Go ▶" style={styles.goFlex} onPress={() => setRoutingTo(selectedPlace)} />
           </View>
         </View>
       )}
@@ -332,16 +343,15 @@ export default function MapScreen() {
             </View>
           )}
           <View style={styles.previewBtns}>
-            <TouchableOpacity style={styles.cancelBtn} onPress={cancel}>
+            <TouchableOpacity style={styles.cancelBtn} activeOpacity={0.55} onPress={cancel}>
               <Text style={styles.cancelText}>Cancel</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.startBtn, !route && styles.startBtnDisabled]}
-              onPress={() => setStarted(true)}
+            <GoldButton
+              label="Start ▶"
+              style={styles.goFlex}
               disabled={!route}
-            >
-              <Text style={styles.startText}>Start ▶</Text>
-            </TouchableOpacity>
+              onPress={() => setStarted(true)}
+            />
           </View>
         </View>
       )}
@@ -357,9 +367,7 @@ export default function MapScreen() {
           {status === 'arrived' ? (
             <View style={styles.arrived}>
               <Text style={styles.arrivedText}>🎉 You’ve arrived!</Text>
-              <TouchableOpacity onPress={cancel} style={styles.startBtn}>
-                <Text style={styles.startText}>Done</Text>
-              </TouchableOpacity>
+              <GoldButton label="Done" style={styles.goStretch} onPress={cancel} />
             </View>
           ) : (
             !addingStop && (
@@ -396,28 +404,35 @@ export default function MapScreen() {
 
       {/* Floating controls — bottom-right stack. Idle: store / profile / recenter.
           Once a route is active: overview / recenter / audio. */}
-      {!inRoute ? (
+      {/* Idle: store + recenter, floating just above the bottom search bar
+          (hidden while the keyboard is up so they don't fly off-screen). */}
+      {!inRoute && !searchInfo.keyboardOpen && (
         <>
-          <TouchableOpacity style={[styles.fab, styles.fabPos1]} onPress={() => setStoreOpen(true)}>
-            <Text style={styles.fabIcon}>🛒</Text>
+          <TouchableOpacity
+            style={[styles.fab, styles.fabDark, { bottom: 30 + searchInfo.height }]}
+            onPress={() => setStoreOpen(true)}
+          >
+            <Image source={ICON_STORE} style={styles.fabFill} resizeMode="cover" />
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.fab, styles.fabPos2]} onPress={() => setProfileOpen(true)}>
-            <Text style={styles.fabIcon}>👤</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.fab, styles.fabPos3]} onPress={recenter}>
-            <Text style={styles.fabIcon}>🧭</Text>
+          <TouchableOpacity
+            style={[styles.fab, { bottom: 30 + searchInfo.height + 72 }]}
+            onPress={recenter}
+          >
+            <Image source={ICON_RECENTER} style={styles.fabImg} resizeMode="contain" />
           </TouchableOpacity>
         </>
-      ) : (
+      )}
+      {/* Route active: overview + recenter + audio. */}
+      {inRoute && (
         <>
           <TouchableOpacity style={[styles.fab, styles.fabPos1]} onPress={overview}>
-            <Text style={styles.fabIcon}>⤢</Text>
+            <Image source={ICON_OVERVIEW} style={styles.fabImg} resizeMode="contain" />
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.fab, styles.fabPos2, isNav && !following && styles.fabRecenterActive]}
             onPress={recenter}
           >
-            <Text style={styles.fabIcon}>🧭</Text>
+            <Image source={ICON_RECENTER} style={styles.fabImg} resizeMode="contain" />
           </TouchableOpacity>
           <TouchableOpacity style={[styles.fab, styles.fabPos3]} onPress={() => setVoiceOn(!voiceOn)}>
             <Text style={styles.fabIcon}>{voiceOn ? '🔊' : '🔇'}</Text>
@@ -442,13 +457,14 @@ export default function MapScreen() {
   );
 }
 
+// Dark frosted-glass card (matches the reference testimonial look).
 const card = {
   position: 'absolute' as const,
   left: 12,
   right: 12,
-  backgroundColor: theme.colors.overlay,
+  backgroundColor: 'rgba(18,22,30,0.88)',
   borderWidth: 1,
-  borderColor: theme.colors.border,
+  borderColor: 'rgba(255,255,255,0.14)',
   borderRadius: theme.radius.lg,
   padding: 18,
 };
@@ -460,17 +476,17 @@ const styles = StyleSheet.create({
 
   previewCard: { ...card, bottom: 24, gap: 6 },
   previewTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  previewTitle: { flex: 1, color: theme.colors.textPrimary, fontSize: 18, fontWeight: '800' },
-  saveStar: { color: theme.colors.textSecondary, fontSize: 26, paddingLeft: 12 },
+  previewTitle: { flex: 1, color: '#ffffff', fontSize: 18, fontWeight: '800' },
+  saveStar: { color: 'rgba(255,255,255,0.7)', fontSize: 26, paddingLeft: 12 },
   saveStarOn: { color: theme.colors.accent },
-  previewSub: { color: theme.colors.success, fontSize: 14, fontWeight: '600' },
-  previewAddr: { color: theme.colors.textSecondary, fontSize: 13, lineHeight: 18 },
-  previewErr: { color: theme.colors.danger, fontSize: 14, fontWeight: '600' },
+  previewSub: { color: '#5ee08a', fontSize: 14, fontWeight: '600' },
+  previewAddr: { color: 'rgba(255,255,255,0.6)', fontSize: 13, lineHeight: 18 },
+  previewErr: { color: '#ff6b6b', fontSize: 14, fontWeight: '600' },
 
   routeOptions: { flexDirection: 'row', gap: 8, marginTop: 4 },
   routeOpt: {
     flex: 1,
-    backgroundColor: theme.colors.cardElevated,
+    backgroundColor: 'rgba(255,255,255,0.08)',
     borderRadius: theme.radius.sm,
     paddingVertical: 10,
     paddingHorizontal: 8,
@@ -478,13 +494,13 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
     alignItems: 'center',
   },
-  routeOptActive: { borderColor: theme.colors.accent, backgroundColor: theme.colors.card },
-  routeEta: { color: theme.colors.textPrimary, fontSize: 16, fontWeight: '800' },
-  routeEtaActive: { color: theme.colors.textPrimary },
-  routeDist: { color: theme.colors.textSecondary, fontSize: 12, marginTop: 1 },
-  routeDistActive: { color: theme.colors.textSecondary },
-  routeTag: { color: theme.colors.textMuted, fontSize: 11, fontWeight: '700', marginTop: 3 },
-  routeTagActive: { color: theme.colors.accentStrong },
+  routeOptActive: { borderColor: theme.colors.accent, backgroundColor: 'rgba(255,255,255,0.16)' },
+  routeEta: { color: '#ffffff', fontSize: 16, fontWeight: '800' },
+  routeEtaActive: { color: '#ffffff' },
+  routeDist: { color: 'rgba(255,255,255,0.6)', fontSize: 12, marginTop: 1 },
+  routeDistActive: { color: 'rgba(255,255,255,0.75)' },
+  routeTag: { color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: '700', marginTop: 3 },
+  routeTagActive: { color: theme.colors.accent },
 
   placePin: {
     width: 18,
@@ -494,21 +510,20 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: '#fff',
   },
-  previewBtns: { flexDirection: 'row', gap: 10, marginTop: 12 },
-  cancelBtn: { flex: 1, paddingVertical: 14, borderRadius: theme.radius.sm, backgroundColor: theme.colors.card, alignItems: 'center' },
-  cancelText: { color: theme.colors.textPrimary, fontWeight: '700', fontSize: 16 },
-  startBtn: { flex: 2, paddingVertical: 14, borderRadius: theme.radius.sm, backgroundColor: theme.colors.accent, alignItems: 'center' },
-  startBtnDisabled: { opacity: 0.5 },
-  startText: { color: theme.colors.onAccent, fontWeight: '800', fontSize: 16 },
+  previewBtns: { flexDirection: 'row', gap: 10, marginTop: 12, alignItems: 'center' },
+  cancelBtn: { flex: 1, paddingVertical: 14, borderRadius: theme.radius.sm, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center' },
+  cancelText: { color: '#ffffff', fontWeight: '700', fontSize: 16 },
+  goFlex: { flex: 2 },
+  goStretch: { alignSelf: 'stretch' },
 
   arrived: { ...card, bottom: 24, alignItems: 'center', gap: 12 },
-  arrivedText: { color: theme.colors.textPrimary, fontSize: 20, fontWeight: '800' },
+  arrivedText: { color: '#ffffff', fontSize: 20, fontWeight: '800' },
 
   fab: {
     position: 'absolute',
-    right: 12,
-    width: 52,
-    height: 52,
+    right: 14,
+    width: 64,
+    height: 64,
     borderRadius: theme.radius.pill,
     backgroundColor: theme.colors.overlay,
     borderWidth: 1,
@@ -516,12 +531,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // Bottom-right vertical stack of three (57px pitch).
-  fabPos1: { bottom: 110 },
-  fabPos2: { bottom: 167 },
-  fabPos3: { bottom: 224 },
+  // Bottom-right vertical stack of three — raised well off the bottom edge.
+  fabPos1: { bottom: 252 },
+  fabPos2: { bottom: 324 },
+  fabPos3: { bottom: 396 },
   fabRecenterActive: { backgroundColor: theme.colors.accent, borderColor: theme.colors.accent },
-  fabIcon: { fontSize: 24 },
+  fabIcon: { fontSize: 30 },
+  fabImg: { width: 44, height: 44 },
+  // Dark face (for the black-background chrome store icon); image fills the circle.
+  fabDark: { backgroundColor: '#000', borderColor: 'rgba(255,255,255,0.22)', overflow: 'hidden' },
+  fabFill: { width: '100%', height: '100%' },
 
   addStopCancel: {
     position: 'absolute',
