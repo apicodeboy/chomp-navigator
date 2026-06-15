@@ -26,12 +26,16 @@ import ProfileScreen from './ProfileScreen';
 import SettingsModal from './SettingsModal';
 import AccountModal from './AccountModal';
 import FavoritesModal from './FavoritesModal';
+import NearbySheet from './NearbySheet';
+import NearbyMarkers from './NearbyMarkers';
 import TicketBalance from './TicketBalance';
+import { fetchNearby, nearbyToPlace, RADIUS_MILES, type NearbyPlace } from '@/services/nearby';
 import { useSkinStore } from '@/store/useSkinStore';
 import { useMapStyle } from '@/store/useMapStyle';
 import { useTickets } from '@/store/useTickets';
 import { useSettings } from '@/store/useSettings';
 import { addFavorite, isFavorite } from '@/lib/favorites';
+import { addRecent } from '@/lib/recents';
 import { formatDistance, formatDuration } from '@/utils/format';
 import { routeBounds, straightLineM } from '@/utils/geo';
 import { theme } from '@/theme';
@@ -71,6 +75,11 @@ export default function MapScreen() {
   const [following, setFollowing] = useState(true);
   // Reported by the bottom search bar so the idle buttons float just above it.
   const [searchInfo, setSearchInfo] = useState({ height: 150, keyboardOpen: false });
+  // Nearby feature (gas / food / EV / hotels within RADIUS_MILES).
+  const [nearbyOpen, setNearbyOpen] = useState(false);
+  const [nearbyLoading, setNearbyLoading] = useState(false);
+  const [nearbyResults, setNearbyResults] = useState<NearbyPlace[]>([]);
+  const [nearbyFilter, setNearbyFilter] = useState('all');
 
   const { route, routes, selectedIndex, selectRoute, pellets, progress, status, error, reset } =
     useNavigation(routingTo?.coord ?? null, fix, started, waypoints);
@@ -83,6 +92,7 @@ export default function MapScreen() {
     setSelectedPlace(p);
     setRoutingTo(null);
     setStarted(false);
+    void addRecent(p); // remember it for the search bar's Recent list
   }
 
   // Reflect whether the selected place is already saved.
@@ -100,6 +110,28 @@ export default function MapScreen() {
   // Straight-line distance from the user to the selected place (cheap label).
   const placeDistanceM =
     selectedPlace && fix ? straightLineM(fix.coord, selectedPlace.coord) : null;
+
+  // Nearby: a search-bar category chip (Food, Gas, …) opens the Nearby sheet for
+  // that category — places within RADIUS_MILES, nearest first, with map pins.
+  async function openNearbyCategory(cat: string) {
+    if (!fix) return;
+    setNearbyFilter(cat);
+    setNearbyOpen(true);
+    setNearbyLoading(true);
+    try {
+      setNearbyResults(await fetchNearby(fix.coord, [cat], RADIUS_MILES));
+    } catch {
+      setNearbyResults([]);
+    } finally {
+      setNearbyLoading(false);
+    }
+  }
+
+  // Tapping a Nearby result (list or pin): route through the normal place flow.
+  function onNearbyPick(n: NearbyPlace) {
+    setNearbyOpen(false);
+    pickPlace(nearbyToPlace(n));
+  }
 
   // On arrival, add the trip distance to the lifetime total and report it; the
   // server credits Tickets for any newly crossed distance milestone.
@@ -133,6 +165,7 @@ export default function MapScreen() {
     setWaypoints([]);
     setAddingStop(false);
     setStarted(false);
+    setNearbyResults([]);
   }
 
   // The route is "active" once a destination is picked (place card, route
@@ -261,6 +294,11 @@ export default function MapScreen() {
           </Mapbox.PointAnnotation>
         )}
 
+        {/* Nearby result pins on the existing map (idle only). */}
+        {!inRoute && nearbyResults.length > 0 && (
+          <NearbyMarkers results={nearbyResults} filter={nearbyFilter} onTap={onNearbyPick} />
+        )}
+
         {/* Preview: route alternatives + endpoints. */}
         {isPreview && routes.length > 0 && (
           <PreviewLayer routes={routes} selectedIndex={selectedIndex} color={lineColor} />
@@ -278,6 +316,7 @@ export default function MapScreen() {
           near={fix?.coord ?? null}
           onPick={pickPlace}
           onOpenProfile={() => setProfileOpen(true)}
+          onCategory={openNearbyCategory}
           onLayoutChange={setSearchInfo}
         />
       )}
@@ -452,6 +491,15 @@ export default function MapScreen() {
       <FavoritesModal visible={favoritesOpen} onClose={() => setFavoritesOpen(false)} onPick={pickPlace} />
       <SettingsModal visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <AccountModal visible={accountOpen} onClose={() => setAccountOpen(false)} />
+      <NearbySheet
+        visible={nearbyOpen}
+        loading={nearbyLoading}
+        results={nearbyResults}
+        filter={nearbyFilter}
+        onFilter={openNearbyCategory}
+        onClose={() => setNearbyOpen(false)}
+        onPick={onNearbyPick}
+      />
       {error && <Text style={styles.error}>{error}</Text>}
     </View>
   );
@@ -476,7 +524,7 @@ const styles = StyleSheet.create({
 
   previewCard: { ...card, bottom: 24, gap: 6 },
   previewTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  previewTitle: { flex: 1, color: '#ffffff', fontSize: 18, fontWeight: '800' },
+  previewTitle: { flex: 1, color: '#ffffff', fontSize: 21, fontWeight: '800', letterSpacing: -0.5 },
   saveStar: { color: 'rgba(255,255,255,0.7)', fontSize: 26, paddingLeft: 12 },
   saveStarOn: { color: theme.colors.accent },
   previewSub: { color: '#5ee08a', fontSize: 14, fontWeight: '600' },
@@ -495,7 +543,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   routeOptActive: { borderColor: theme.colors.accent, backgroundColor: 'rgba(255,255,255,0.16)' },
-  routeEta: { color: '#ffffff', fontSize: 16, fontWeight: '800' },
+  routeEta: { color: '#ffffff', fontSize: 17, fontWeight: '800', letterSpacing: -0.4 },
   routeEtaActive: { color: '#ffffff' },
   routeDist: { color: 'rgba(255,255,255,0.6)', fontSize: 12, marginTop: 1 },
   routeDistActive: { color: 'rgba(255,255,255,0.75)' },

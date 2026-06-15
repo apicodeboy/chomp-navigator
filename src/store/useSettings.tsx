@@ -16,7 +16,7 @@ interface Settings {
 
 const Ctx = createContext<Settings | null>(null);
 const KEY = 'chomp.settings';
-const DEFAULT_LINE = '#ffc400';
+const DEFAULT_LINE = '#1d72ff'; // glossy blue route (reference look)
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [voiceOn, setVoiceOnState] = useState(true);

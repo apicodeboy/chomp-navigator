@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
   },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20 },
-  title: { color: theme.colors.textPrimary, fontSize: 22, fontWeight: '800' },
+  title: { ...theme.type.title, color: theme.colors.textPrimary },
   close: { color: theme.colors.textSecondary, fontSize: 22, paddingHorizontal: 4 },
   body: { alignItems: 'center', paddingHorizontal: 24, paddingTop: 8 },
   avatar: {

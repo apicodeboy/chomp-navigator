@@ -15,20 +15,33 @@ interface Props {
 export default function RouteLine({ line, color }: Props) {
   return (
     <Mapbox.ShapeSource id="nav-route" shape={line}>
+      {/* White outer casing — makes the route pop on the light map. */}
       <Mapbox.LineLayer
         id="nav-route-casing"
         style={{
-          lineColor: 'rgba(0,0,0,0.55)',
-          lineWidth: 11,
+          lineColor: '#ffffff',
+          lineWidth: 17,
           lineCap: 'round',
           lineJoin: 'round',
         }}
       />
+      {/* Glossy colored core. */}
       <Mapbox.LineLayer
         id="nav-route-line"
         style={{
           lineColor: color,
-          lineWidth: 7,
+          lineWidth: 11,
+          lineCap: 'round',
+          lineJoin: 'round',
+          lineEmissiveStrength: 1,
+        }}
+      />
+      {/* Subtle top-light sheen for the 3D candy look. */}
+      <Mapbox.LineLayer
+        id="nav-route-sheen"
+        style={{
+          lineColor: 'rgba(255,255,255,0.35)',
+          lineWidth: 3,
           lineCap: 'round',
           lineJoin: 'round',
           lineEmissiveStrength: 1,

@@ -42,6 +42,21 @@ export const theme = {
     overlay: 'rgba(255,255,255,0.96)',
   },
   radius: { pill: 999, lg: 22, md: 16, sm: 12 },
+  /**
+   * Apple-style type scale (San Francisco system font). The hallmark of Apple's
+   * typography is heavy weights with TIGHT negative tracking on large text — that
+   * is what makes it read as iOS rather than stock Android. Spread these into a
+   * StyleSheet entry, then add `color`.
+   */
+  type: {
+    largeTitle: { fontSize: 32, fontWeight: '800' as const, letterSpacing: -0.8 },
+    title: { fontSize: 25, fontWeight: '800' as const, letterSpacing: -0.6 },
+    headline: { fontSize: 18, fontWeight: '700' as const, letterSpacing: -0.4 },
+    body: { fontSize: 16, fontWeight: '500' as const, letterSpacing: -0.2 },
+    callout: { fontSize: 15, fontWeight: '600' as const, letterSpacing: -0.2 },
+    caption: { fontSize: 13, fontWeight: '500' as const, letterSpacing: -0.1 },
+    button: { fontSize: 17, fontWeight: '700' as const, letterSpacing: -0.4 },
+  },
   /** Dark map style to match the theme. */
   mapStyleUrl: 'mapbox://styles/mapbox/dark-v11',
 } as const;

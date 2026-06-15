@@ -54,7 +54,8 @@ export const MAP_STYLES: MapStyleOption[] = [
   { id: 'navigation', name: 'Night Nav', url: 'mapbox://styles/mapbox/navigation-night-v1' },
 ];
 
-export const DEFAULT_MAP_STYLE_ID = MAP_STYLES[0].id;
+// Light "Streets" art by default (matches the Apple-Maps-style reference look).
+export const DEFAULT_MAP_STYLE_ID = 'streets';
 
 export function getMapStyle(id: string): MapStyleOption {
   return MAP_STYLES.find((s) => s.id === id) ?? MAP_STYLES[0];

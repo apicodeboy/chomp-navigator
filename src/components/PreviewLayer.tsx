@@ -49,51 +49,62 @@ export default function PreviewLayer({ routes, selectedIndex, color }: Props) {
         </Mapbox.ShapeSource>
       )}
 
-      {/* Selected route on top: casing for contrast, then the accent line. */}
+      {/* Selected route: white casing → glossy colored core → sheen. */}
       <Mapbox.ShapeSource id="preview-route" shape={selected.line}>
         <Mapbox.LineLayer
           id="preview-casing"
-          style={{
-            lineColor: theme.colors.characterOutline,
-            lineWidth: 9,
-            lineCap: 'round',
-            lineJoin: 'round',
-          }}
+          style={{ lineColor: '#ffffff', lineWidth: 16, lineCap: 'round', lineJoin: 'round' }}
         />
         <Mapbox.LineLayer
           id="preview-line"
-          style={{
-            lineColor: color,
-            lineWidth: 5,
-            lineCap: 'round',
-            lineJoin: 'round',
-          }}
+          style={{ lineColor: color, lineWidth: 10, lineCap: 'round', lineJoin: 'round', lineEmissiveStrength: 1 }}
+        />
+        <Mapbox.LineLayer
+          id="preview-sheen"
+          style={{ lineColor: 'rgba(255,255,255,0.35)', lineWidth: 3, lineCap: 'round', lineJoin: 'round' }}
         />
       </Mapbox.ShapeSource>
 
       <Mapbox.PointAnnotation id="origin" coordinate={origin}>
-        <Dot color={theme.colors.success} />
+        <View style={styles.origin} />
       </Mapbox.PointAnnotation>
       <Mapbox.PointAnnotation id="destination" coordinate={destination}>
-        <Dot color={theme.colors.accent} ring />
+        {/* Glossy 3D destination orb. */}
+        <View style={[styles.orb, { backgroundColor: color }]}>
+          <View style={styles.orbHighlight} />
+        </View>
       </Mapbox.PointAnnotation>
     </>
   );
 }
 
-function Dot({ color, ring }: { color: string; ring?: boolean }) {
-  return (
-    <View style={[styles.dot, { backgroundColor: color }, ring && styles.ring]} />
-  );
-}
-
 const styles = StyleSheet.create({
-  dot: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 3,
-    borderColor: 'white',
+  origin: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#ffffff',
+    borderWidth: 4,
+    borderColor: '#1d72ff',
   },
-  ring: { width: 22, height: 22, borderRadius: 11 },
+  orb: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 3,
+    borderColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  orbHighlight: {
+    width: 12,
+    height: 6,
+    borderRadius: 6,
+    marginTop: 3,
+    backgroundColor: 'rgba(255,255,255,0.6)',
+  },
 });

@@ -10,8 +10,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { categorySearch, geocodeSuggestions } from '@/services/directions';
+import { geocodeSuggestions } from '@/services/directions';
 import { addFavorite, getFavorites, removeFavorite } from '@/lib/favorites';
+import { getRecents } from '@/lib/recents';
 import { straightLineM } from '@/utils/geo';
 import { formatDistance } from '@/utils/format';
 import { theme } from '@/theme';
@@ -25,6 +26,8 @@ interface Props {
   onPick: (place: Place) => void;
   /** When provided, the profile chip is shown on the right end of the bar. */
   onOpenProfile?: () => void;
+  /** Tapping a category chip opens the Nearby sheet for that category. */
+  onCategory?: (category: string) => void;
   /** Report the bar's height + keyboard state so callers can float buttons above it. */
   onLayoutChange?: (info: { height: number; keyboardOpen: boolean }) => void;
 }
@@ -46,13 +49,14 @@ const CHIPS: { cat: string; label: string; tint: string }[] = [
  * the profile chip on the right end, and a "Suggested" keyword-chip row above it.
  * Lifts above the keyboard while typing.
  */
-export default function SearchPanel({ near, onPick, onOpenProfile, onLayoutChange }: Props) {
+export default function SearchPanel({ near, onPick, onOpenProfile, onCategory, onLayoutChange }: Props) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Place[]>([]);
   const [loading, setLoading] = useState(false);
   const [showSuggest, setShowSuggest] = useState(true);
   const [kb, setKb] = useState(0);
   const [starred, setStarred] = useState<Set<string>>(new Set());
+  const [recents, setRecents] = useState<Place[]>([]);
   const [cardHeight, setCardHeight] = useState(150);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -66,9 +70,10 @@ export default function SearchPanel({ near, onPick, onOpenProfile, onLayoutChang
     };
   }, []);
 
-  // Load which places are already starred.
+  // Load which places are already starred, and the recent places.
   useEffect(() => {
     getFavorites().then((f) => setStarred(new Set(f.map((x) => x.id))));
+    getRecents().then((r) => setRecents(r.slice(0, 10)));
   }, []);
 
   // Report size + keyboard state up so the floating buttons can sit above the bar.
@@ -117,19 +122,6 @@ export default function SearchPanel({ near, onPick, onOpenProfile, onLayoutChang
     setQuery('');
     setResults([]);
     onPick(p);
-  }
-
-  async function runCategory(cat: string, label: string) {
-    setLoading(true);
-    try {
-      // Within 20 miles, nearest first.
-      setResults(await categorySearch(cat, near ?? undefined, 20));
-      setQuery(label);
-    } catch {
-      setResults([]);
-    } finally {
-      setLoading(false);
-    }
   }
 
   const showResults = results.length > 0;
@@ -183,12 +175,37 @@ export default function SearchPanel({ near, onPick, onOpenProfile, onLayoutChang
                 <TouchableOpacity
                   key={c.cat}
                   style={[styles.chip, { backgroundColor: c.tint }]}
-                  onPress={() => runCategory(c.cat, c.label)}
+                  onPress={() => onCategory?.(c.cat)}
                 >
                   <Text style={styles.chipText}>{c.label}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
+
+            {/* Recent places (up to 10) — bubble-card list (reference theme). */}
+            {recents.length > 0 && (
+              <>
+                <Text style={styles.recentHead}>Recent</Text>
+                <ScrollView style={styles.recentScroll} keyboardShouldPersistTaps="handled">
+                  <View style={styles.recentCard}>
+                    {recents.map((r, i) => (
+                      <TouchableOpacity
+                        key={r.id}
+                        activeOpacity={0.6}
+                        style={[styles.recentRow, i < recents.length - 1 && styles.recentDivider]}
+                        onPress={() => pick(r)}
+                      >
+                        <Text style={styles.recentIcon}>🕘</Text>
+                        <View style={styles.recentMain}>
+                          <Text style={styles.recentName}>{r.name}</Text>
+                          <Text style={styles.recentAddr}>{r.address}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </ScrollView>
+              </>
+            )}
           </View>
         )}
 
@@ -271,10 +288,21 @@ const styles = StyleSheet.create({
   },
   chipText: { color: '#ffffff', fontSize: 14, fontWeight: '600' },
 
+  recentHead: { color: 'rgba(255,255,255,0.5)', fontSize: 12.5, fontWeight: '700', paddingHorizontal: 8, marginTop: 12, marginBottom: 6 },
+  recentScroll: { maxHeight: 230 },
+  recentCard: { backgroundColor: '#ffffff', borderRadius: 18, marginHorizontal: 4, overflow: 'hidden' },
+  recentRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 14, gap: 12 },
+  recentDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(0,0,0,0.08)' },
+  recentIcon: { fontSize: 16 },
+  recentMain: { flex: 1 },
+  // No numberOfLines — names/addresses show in full.
+  recentName: { color: '#1a1a1a', fontSize: 16, fontWeight: '700', letterSpacing: -0.3 },
+  recentAddr: { color: '#8a8a8e', fontSize: 13, marginTop: 1 },
+
   hr: { height: 1, backgroundColor: 'rgba(255,255,255,0.09)', marginVertical: 6, marginHorizontal: 4 },
 
   inputBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4 },
-  input: { flex: 1, color: '#ffffff', fontSize: 17, paddingVertical: 10 },
+  input: { flex: 1, color: '#ffffff', fontSize: 17, paddingVertical: 10, letterSpacing: -0.3 },
   mag: { fontSize: 16, color: 'rgba(255,255,255,0.6)', paddingHorizontal: 6 },
   vdivider: { width: 1, height: 26, backgroundColor: 'rgba(255,255,255,0.18)', marginHorizontal: 8 },
   profileBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },

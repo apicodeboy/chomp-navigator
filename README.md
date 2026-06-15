@@ -151,3 +151,48 @@ skins are never granted locally in production. "Restore purchases" is implemente
 3. Pass the chosen skin down from `MapScreen` → `ChomperMarker`.
 
 No navigation code needs to change to support new characters.
+
+## Nearby feature (server-side Mapbox proxy)
+
+Finds gas / food / EV / hotels near the user. Search requests go through our own
+Edge Function so the **Search Box token never ships in the app**.
+
+> Caveat: a native maps app must still bundle a public token for `@rnmapbox/maps`
+> to render tiles on-device. Use a **separate, restricted** token for the proxy
+> (URL/referrer-restricted) vs. the map-tile token (app/bundle-restricted).
+
+### Backend — Supabase Edge Function `nearby`
+
+Env var (a Mapbox public token used only for Search; never hardcoded):
+
+```bash
+supabase secrets set MAPBOX_TOKEN=pk.your_search_only_token
+supabase functions deploy nearby --no-verify-jwt
+```
+
+Contract:
+
+```
+GET /functions/v1/nearby?lat={lat}&lng={lng}&radius={miles}&categories=gas_station,restaurant
+-> 200 { "results": NearbyPlace[] }
+-> 400/500/502 { "results": [], "error": "..." }
+
+NearbyPlace = {
+  id, name, category,
+  coordinates: { lat, lng },
+  address, distanceMiles
+}
+```
+
+- `radius` defaults to **20** miles (capped at 100); `categories` is a CSV of
+  Mapbox Search Box canonical ids (default `gas_station,restaurant`).
+- Computes a bbox from the radius, fetches each category concurrently, then
+  haversine-filters to a true circle and sorts ascending by `distanceMiles`.
+
+### Frontend
+
+- `src/services/nearby.ts` — `RADIUS_MILES` (change the default here), `fetchNearby()`,
+  and the proxy URL (override with `NEARBY_API_URL` in `.env`, else falls back to
+  this project's deployed function).
+- `NearbySheet` (list + Gas/Food/EV/Hotels filter) and `NearbyMarkers` (pins on the
+  existing map) wired into `MapScreen`; tapping a result uses the existing routing flow.

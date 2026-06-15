@@ -72,7 +72,7 @@ const styles = StyleSheet.create({
     maxHeight: '88%',
   },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20 },
-  title: { color: theme.colors.textPrimary, fontSize: 22, fontWeight: '800' },
+  title: { ...theme.type.title, color: theme.colors.textPrimary },
   close: { color: theme.colors.textSecondary, fontSize: 22, paddingHorizontal: 4 },
   scroll: { paddingHorizontal: 16 },
   empty: { color: theme.colors.textSecondary, fontSize: 14, textAlign: 'center', paddingVertical: 24, lineHeight: 20 },

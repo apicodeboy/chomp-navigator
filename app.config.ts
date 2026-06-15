@@ -81,6 +81,9 @@ const config: ExpoConfig = {
     // signed-out users from the in-app store to create an account. Empty =
     // not configured yet (the in-app prompt degrades gracefully).
     webAuthUrl: process.env.WEB_AUTH_URL ?? '',
+    // Server-side "Nearby" proxy (Supabase `nearby` Edge Function). Empty falls
+    // back to this project's deployed function URL (see src/services/nearby.ts).
+    nearbyApiUrl: process.env.NEARBY_API_URL ?? '',
     eas: { projectId: '641a1b7b-9ffd-4fa0-b5fd-4a1c08b31ae5' },
   },
 };

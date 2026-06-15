@@ -85,5 +85,5 @@ const styles = StyleSheet.create({
     height: '52%',
     backgroundColor: 'rgba(255,255,255,0.30)',
   },
-  text: { color: '#1c1c1e', fontWeight: '900', fontSize: 17, letterSpacing: 0.5 },
+  text: { color: '#1c1c1e', fontWeight: '900', fontSize: 18, letterSpacing: -0.4 },
 });

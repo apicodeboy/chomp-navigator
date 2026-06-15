@@ -78,12 +78,14 @@ export default function NavPanel({
         </TouchableOpacity>
 
         <View style={styles.etaRow}>
-          <View>
-            <Text style={styles.eta}>{fmtEta(remainingSec)}</Text>
-            <Text style={styles.sub}>{formatDistance(distRemainingM, units)} remaining</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.eta}>
+              Arriving in <Text style={styles.etaMins}>{Math.max(1, Math.round(remainingSec / 60))} min</Text>
+            </Text>
+            <Text style={styles.sub}>{formatDistance(distRemainingM, units)} away · {fmtEta(remainingSec).split('· ')[1] ?? ''}</Text>
           </View>
-          <TouchableOpacity onPress={onStop} hitSlop={10}>
-            <Text style={styles.stop}>✕ End</Text>
+          <TouchableOpacity onPress={onStop} hitSlop={10} style={styles.stopBtn}>
+            <Text style={styles.stop}>End</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -108,42 +110,48 @@ function Action({ icon, label, onPress }: { icon: string; label: string; onPress
   );
 }
 
+const BLUE = '#1d72ff';
+
 const styles = StyleSheet.create({
   wrap: {
     position: 'absolute',
     left: 12,
     right: 12,
     bottom: 24,
-    backgroundColor: theme.colors.overlay,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+    backgroundColor: BLUE,
     borderRadius: theme.radius.lg,
-    paddingHorizontal: 18,
-    paddingBottom: 14,
-    paddingTop: 8,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    paddingTop: 10,
+    shadowColor: BLUE,
+    shadowOpacity: 0.45,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
   },
   handle: {
     alignSelf: 'center',
     width: 40,
     height: 5,
     borderRadius: 3,
-    backgroundColor: theme.colors.border,
-    marginBottom: 10,
+    backgroundColor: 'rgba(255,255,255,0.5)',
+    marginBottom: 12,
   },
   etaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  eta: { color: theme.colors.textPrimary, fontSize: 20, fontWeight: '800' },
-  sub: { color: theme.colors.textSecondary, fontSize: 13, marginTop: 2 },
-  stop: { color: theme.colors.danger, fontSize: 16, fontWeight: '700', paddingHorizontal: 12, paddingVertical: 8 },
+  eta: { color: '#ffffff', fontSize: 26, fontWeight: '800', letterSpacing: -0.6 },
+  etaMins: { color: '#9fd4ff' },
+  sub: { color: 'rgba(255,255,255,0.85)', fontSize: 14, marginTop: 3, fontWeight: '500' },
+  stopBtn: { backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: theme.radius.pill, paddingHorizontal: 18, paddingVertical: 10 },
+  stop: { color: '#ffffff', fontSize: 16, fontWeight: '800' },
   actions: { flexDirection: 'row', justifyContent: 'space-around', overflow: 'hidden' },
-  action: { alignItems: 'center', paddingTop: 14 },
+  action: { alignItems: 'center', paddingTop: 16 },
   actionCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: theme.colors.cardElevated,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   actionIcon: { fontSize: 22 },
-  actionLabel: { color: theme.colors.textSecondary, fontSize: 12, marginTop: 5 },
+  actionLabel: { color: 'rgba(255,255,255,0.9)', fontSize: 12, marginTop: 6, fontWeight: '600' },
 });
