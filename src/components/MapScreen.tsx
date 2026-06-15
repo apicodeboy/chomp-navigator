@@ -325,7 +325,7 @@ export default function MapScreen() {
       {status === 'idle' && selectedPlace && (
         <View style={styles.previewCard}>
           <View style={styles.previewTitleRow}>
-            <Text style={styles.previewTitle} numberOfLines={1}>{selectedPlace.name}</Text>
+            <Text style={styles.previewTitle}>{selectedPlace.name}</Text>
             <TouchableOpacity onPress={saveCurrentPlace} hitSlop={10} disabled={placeSaved}>
               <Text style={[styles.saveStar, placeSaved && styles.saveStarOn]}>
                 {placeSaved ? '★' : '☆'}
@@ -350,7 +350,7 @@ export default function MapScreen() {
       {/* Routing/preview: choose among route alternatives, then Start. */}
       {(isPreview || status === 'error') && (
         <View style={styles.previewCard}>
-          <Text style={styles.previewTitle} numberOfLines={1}>
+          <Text style={styles.previewTitle}>
             {routingTo?.name ?? selectedPlace?.name ?? 'Routes'}
           </Text>
           {status === 'error' ? (

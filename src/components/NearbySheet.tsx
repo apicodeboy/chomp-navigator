@@ -57,6 +57,7 @@ export default function NearbySheet({ visible, loading, results, filter, onFilte
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
+            style={styles.filtersScroll}
             contentContainerStyle={styles.filters}
           >
             {FILTERS.map((f) => {
@@ -130,17 +131,22 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 6 },
   title: { ...theme.type.title, color: '#222' },
   close: { color: '#888', fontSize: 22, paddingHorizontal: 4 },
-  filters: { paddingHorizontal: 16, gap: 8, paddingVertical: 8 },
+  // flexGrow:0 + fixed height stop the horizontal row from expanding to fill the
+  // sheet (which was stretching the pills into tall ovals).
+  filtersScroll: { flexGrow: 0, height: 54 },
+  filters: { paddingHorizontal: 16, gap: 8, alignItems: 'center' },
   filter: {
-    paddingVertical: 9,
-    paddingHorizontal: 16,
+    height: 38,
+    paddingHorizontal: 18,
     borderRadius: theme.radius.pill,
     backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   filterOn: { backgroundColor: theme.colors.accent, borderColor: theme.colors.accent },
-  filterText: { color: '#444', fontWeight: '700', fontSize: 13 },
+  filterText: { color: '#444', fontWeight: '700', fontSize: 13, lineHeight: 17 },
   filterTextOn: { color: theme.colors.onAccent },
   center: { padding: 40, alignItems: 'center', gap: 12 },
   muted: { color: '#8a7f72', fontSize: 14, textAlign: 'center' },

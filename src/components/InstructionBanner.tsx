@@ -55,7 +55,7 @@ export default function InstructionBanner({ step, distanceM, units }: Props) {
       <Text style={styles.arrow}>{arrowFor(type, modifier)}</Text>
       <View style={styles.textCol}>
         <Text style={styles.dist}>{formatDistance(distanceM, units)}</Text>
-        <Text style={styles.instruction} numberOfLines={2}>
+        <Text style={styles.instruction}>
           {text}
         </Text>
       </View>

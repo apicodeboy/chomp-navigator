@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Dimensions,
   Image,
   Keyboard,
+  PanResponder,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,9 +12,17 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { geocodeSuggestions } from '@/services/directions';
+import { fetchNearby, nearbyToPlace } from '@/services/nearby';
 import { addFavorite, getFavorites, removeFavorite } from '@/lib/favorites';
-import { getRecents } from '@/lib/recents';
+import { getRecents, removeRecent } from '@/lib/recents';
+
+// Pre-expanded panel height — the search occupies roughly the bottom half.
+const SCREEN_H = Dimensions.get('window').height;
+const PANEL_H = Math.round(SCREEN_H * 0.4);
+const PANEL_MIN = 90;
+const PANEL_MAX = Math.round(SCREEN_H * 0.66);
 import { straightLineM } from '@/utils/geo';
 import { formatDistance } from '@/utils/format';
 import { theme } from '@/theme';
@@ -57,8 +67,28 @@ export default function SearchPanel({ near, onPick, onOpenProfile, onCategory, o
   const [kb, setKb] = useState(0);
   const [starred, setStarred] = useState<Set<string>>(new Set());
   const [recents, setRecents] = useState<Place[]>([]);
-  const [cardHeight, setCardHeight] = useState(150);
+  const [recommend, setRecommend] = useState<Place[]>([]);
+  const [cardHeight, setCardHeight] = useState(PANEL_H + 120);
+  // Draggable body height — pull the handle up/down to resize the panel.
+  const [panelH, setPanelH] = useState(PANEL_H);
+  const panelHRef = useRef(PANEL_H);
+  const dragStart = useRef(PANEL_H);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const drag = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dy) > 4,
+      onPanResponderGrant: () => {
+        dragStart.current = panelHRef.current;
+      },
+      onPanResponderMove: (_e, g) => {
+        // Drag up (dy < 0) grows the panel; down shrinks it.
+        const next = Math.max(PANEL_MIN, Math.min(PANEL_MAX, dragStart.current - g.dy));
+        panelHRef.current = next;
+        setPanelH(next);
+      },
+    }),
+  ).current;
 
   // Lift the bar above the keyboard.
   useEffect(() => {
@@ -75,6 +105,23 @@ export default function SearchPanel({ near, onPick, onOpenProfile, onCategory, o
     getFavorites().then((f) => setStarred(new Set(f.map((x) => x.id))));
     getRecents().then((r) => setRecents(r.slice(0, 10)));
   }, []);
+
+  // Always pull area recommendations so the list can be topped up to full.
+  // Fetch ONCE (the `near` coord updates ~1Hz, so guard against refetching).
+  const fetchedRecommend = useRef(false);
+  useEffect(() => {
+    if (!near || fetchedRecommend.current) return;
+    fetchedRecommend.current = true;
+    fetchNearby(near, ['restaurant', 'coffee', 'grocery'], 20)
+      .then((n) => setRecommend(n.map(nearbyToPlace)))
+      .catch(() => {
+        fetchedRecommend.current = false; // allow a retry
+      });
+  }, [near]);
+
+  async function eraseRecent(id: string) {
+    setRecents((await removeRecent(id)).slice(0, 10));
+  }
 
   // Report size + keyboard state up so the floating buttons can sit above the bar.
   useEffect(() => {
@@ -129,18 +176,27 @@ export default function SearchPanel({ near, onPick, onOpenProfile, onCategory, o
   function distLabel(p: Place): string {
     return near ? formatDistance(straightLineM(near, p.coord), 'mi') : '';
   }
+  // Recents first, then recommendations to top the list up to 10 (deduped).
+  const recentIds = new Set(recents.map((r) => r.id));
+  const places = [...recents, ...recommend.filter((r) => !recentIds.has(r.id))].slice(0, 10);
+  const placesHead = recents.length > 0 ? 'Recent' : 'Recommended nearby';
 
   return (
     <View style={[styles.wrap, { bottom: 16 + kb }]}>
       <View style={styles.card} onLayout={(e) => setCardHeight(e.nativeEvent.layout.height)}>
+        {/* Drag this handle up/down to resize the panel. */}
+        <View {...drag.panHandlers} style={styles.handleHit}>
+          <View style={styles.handle} />
+        </View>
+
         {/* Results (when typing or after a category search) */}
         {results.length > 0 && (
-          <ScrollView style={styles.results} keyboardShouldPersistTaps="handled">
+          <ScrollView style={{ height: panelH }} keyboardShouldPersistTaps="handled">
             {results.map((r) => (
               <View key={r.id} style={styles.resRow}>
                 <TouchableOpacity style={styles.resMain} activeOpacity={0.7} onPress={() => pick(r)}>
-                  <Text style={styles.resName} numberOfLines={1}>{r.name}</Text>
-                  <Text style={styles.resAddr} numberOfLines={1}>
+                  <Text style={styles.resName}>{r.name}</Text>
+                  <Text style={styles.resAddr}>
                     {distLabel(r) ? `${distLabel(r)} · ${r.address}` : r.address}
                   </Text>
                 </TouchableOpacity>
@@ -158,7 +214,7 @@ export default function SearchPanel({ near, onPick, onOpenProfile, onCategory, o
         {showChips && (
           <View style={styles.suggest}>
             <View style={styles.suggestHead}>
-              <Text style={styles.suggestLabel} numberOfLines={1}>
+              <Text style={styles.suggestLabel}>
                 Suggested: tap a category to search nearby
               </Text>
               <TouchableOpacity onPress={() => setShowSuggest(false)} hitSlop={10}>
@@ -182,30 +238,45 @@ export default function SearchPanel({ near, onPick, onOpenProfile, onCategory, o
               ))}
             </ScrollView>
 
-            {/* Recent places (up to 10) — bubble-card list (reference theme). */}
-            {recents.length > 0 && (
-              <>
-                <Text style={styles.recentHead}>Recent</Text>
-                <ScrollView style={styles.recentScroll} keyboardShouldPersistTaps="handled">
-                  <View style={styles.recentCard}>
-                    {recents.map((r, i) => (
-                      <TouchableOpacity
+            {/* Recents (or area recommendations) — bubble-card list, full height
+                so the search panel is pre-stretched toward the middle. */}
+            <Text style={styles.recentHead}>{placesHead}</Text>
+            <ScrollView style={{ height: PANEL_H }} keyboardShouldPersistTaps="handled">
+              {places.length > 0 ? (
+                <View style={styles.recentCard}>
+                  {places.map((r, i) => {
+                    const isRecent = recentIds.has(r.id);
+                    return (
+                      <View
                         key={r.id}
-                        activeOpacity={0.6}
-                        style={[styles.recentRow, i < recents.length - 1 && styles.recentDivider]}
-                        onPress={() => pick(r)}
+                        style={[styles.recentRow, i < places.length - 1 && styles.recentDivider]}
                       >
-                        <Text style={styles.recentIcon}>🕘</Text>
-                        <View style={styles.recentMain}>
-                          <Text style={styles.recentName}>{r.name}</Text>
-                          <Text style={styles.recentAddr}>{r.address}</Text>
-                        </View>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </ScrollView>
-              </>
-            )}
+                        <TouchableOpacity style={styles.recentTap} activeOpacity={0.6} onPress={() => pick(r)}>
+                          <Text style={styles.recentIcon}>{isRecent ? '🕘' : '📍'}</Text>
+                          <View style={styles.recentMain}>
+                            <Text style={styles.recentName}>{r.name}</Text>
+                            <Text style={styles.recentAddr}>
+                              {distLabel(r) ? `${distLabel(r)} · ${r.address}` : r.address}
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                        {isRecent && (
+                          <TouchableOpacity onPress={() => eraseRecent(r.id)} hitSlop={10} style={styles.eraseBtn}>
+                            <Text style={styles.eraseX}>✕</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+              ) : (
+                <View style={styles.placesEmpty}>
+                  <Text style={styles.placesEmptyText}>
+                    {near ? 'Finding places near you…' : 'Search for a place to get started'}
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
           </View>
         )}
 
@@ -280,19 +351,26 @@ const styles = StyleSheet.create({
   x: { color: 'rgba(255,255,255,0.5)', fontSize: 14, paddingLeft: 10 },
   chips: { paddingHorizontal: 6, gap: 8, paddingBottom: 4 },
   chip: {
-    paddingVertical: 9,
+    paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: theme.radius.pill,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.12)',
+    justifyContent: 'center',
   },
-  chipText: { color: '#ffffff', fontSize: 14, fontWeight: '600' },
+  // lineHeight prevents ascenders/descenders from being clipped in the pill.
+  chipText: { color: '#ffffff', fontSize: 14, lineHeight: 19, fontWeight: '600', includeFontPadding: false },
+  placesEmpty: { paddingVertical: 30, alignItems: 'center' },
+  placesEmptyText: { color: 'rgba(255,255,255,0.5)', fontSize: 14 },
 
   recentHead: { color: 'rgba(255,255,255,0.5)', fontSize: 12.5, fontWeight: '700', paddingHorizontal: 8, marginTop: 12, marginBottom: 6 },
   recentScroll: { maxHeight: 230 },
   recentCard: { backgroundColor: '#ffffff', borderRadius: 18, marginHorizontal: 4, overflow: 'hidden' },
-  recentRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 14, gap: 12 },
+  recentRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 14 },
+  recentTap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
   recentDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(0,0,0,0.08)' },
+  eraseBtn: { paddingLeft: 12, paddingVertical: 4 },
+  eraseX: { color: '#bdbdbd', fontSize: 16, fontWeight: '700' },
   recentIcon: { fontSize: 16 },
   recentMain: { flex: 1 },
   // No numberOfLines — names/addresses show in full.

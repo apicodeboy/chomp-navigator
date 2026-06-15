@@ -47,8 +47,8 @@ export default function FavoritesModal({ visible, onClose, onPick }: Props) {
             {favs.map((f) => (
               <View key={f.id} style={styles.item}>
                 <TouchableOpacity style={styles.itemMain} onPress={() => pick(f)}>
-                  <Text style={styles.itemName} numberOfLines={1}>⭐ {f.name}</Text>
-                  <Text style={styles.itemAddr} numberOfLines={1}>{f.address}</Text>
+                  <Text style={styles.itemName}>⭐ {f.name}</Text>
+                  <Text style={styles.itemAddr}>{f.address}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => del(f.id)} hitSlop={10}>
                   <Text style={styles.del}>Remove</Text>
