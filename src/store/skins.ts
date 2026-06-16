@@ -36,64 +36,37 @@ export interface SkinListing extends ChomperSkin {
  */
 export const SKINS: SkinListing[] = [
   {
-    id: 'classic',
+    // The default: gold disk when idle, black arrow once a route starts. Selecting
+    // any other character replaces BOTH the disk and the arrow with that art.
+    id: 'default',
     name: 'Classic',
     priceCents: 0,
     ticketPrice: 0,
-    swatch: '#FFD400',
-    sheet: require('../../assets/chomper.png'),
-    frames: 6,
-    frameSize: 128,
+    swatch: '#E6B400',
+    image: require('../../assets/marker-disk.png'),
+    navImage: require('../../assets/marker-arrow.png'),
+    frames: 1,
+    frameSize: 256,
   },
   {
-    id: 'mint',
-    name: 'Mint',
+    id: 'beanie',
+    name: 'Beanie',
     priceCents: 0,
     ticketPrice: 0,
-    swatch: '#50E0B4',
-    sheet: require('../../assets/chomper-mint.png'),
-    frames: 6,
-    frameSize: 128,
+    swatch: '#4F9BE8',
+    image: require('../../assets/character-beanie.png'),
+    frames: 1,
+    frameSize: 256,
   },
   {
-    id: 'grape',
-    name: 'Grape',
+    id: 'goldgrill',
+    name: 'Gold Grill',
     priceCents: 0,
     ticketPrice: 0,
-    swatch: '#B478FF',
-    sheet: require('../../assets/chomper-grape.png'),
-    frames: 6,
-    frameSize: 128,
-  },
-  {
-    id: 'coral',
-    name: 'Coral',
-    priceCents: 0,
-    ticketPrice: 0,
-    swatch: '#FF6E6E',
-    sheet: require('../../assets/chomper-coral.png'),
-    frames: 6,
-    frameSize: 128,
-  },
-  {
-    id: 'sky',
-    name: 'Sky',
-    priceCents: 0,
-    ticketPrice: 0,
-    swatch: '#7CC4FF',
-    sheet: require('../../assets/chomper-sky.png'),
-    frames: 6,
-    frameSize: 128,
-  },
-  {
-    id: 'lime',
-    name: 'Lime',
-    priceCents: 0,
-    ticketPrice: 0,
-    swatch: '#B6E000',
-    sheet: require('../../assets/chomper-lime.png'),
-    frames: 6,
-    frameSize: 128,
+    swatch: '#F5C518',
+    image: require('../../assets/character-goldgrill.png'),
+    frames: 1,
+    frameSize: 256,
   },
   {
     id: 'oni',
@@ -117,7 +90,7 @@ export const SKINS: SkinListing[] = [
   },
 ];
 
-export const DEFAULT_SKIN_ID = 'classic';
+export const DEFAULT_SKIN_ID = 'default';
 
 export function getSkin(id: string): SkinListing {
   return SKINS.find((s) => s.id === id) ?? SKINS[0];

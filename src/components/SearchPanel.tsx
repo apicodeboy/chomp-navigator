@@ -21,8 +21,11 @@ import { getRecents, removeRecent } from '@/lib/recents';
 // Pre-expanded panel height — the search occupies roughly the bottom half.
 const SCREEN_H = Dimensions.get('window').height;
 const PANEL_H = Math.round(SCREEN_H * 0.4);
-const PANEL_MIN = 90;
+// Can shrink to zero — past COLLAPSE_AT the whole body hides so only the
+// "MAP WRLDS" bar remains (drag the handle back up to reveal it again).
+const PANEL_MIN = 0;
 const PANEL_MAX = Math.round(SCREEN_H * 0.66);
+const COLLAPSE_AT = 56;
 import { straightLineM } from '@/utils/geo';
 import { formatDistance } from '@/utils/format';
 import { theme } from '@/theme';
@@ -171,8 +174,10 @@ export default function SearchPanel({ near, onPick, onOpenProfile, onCategory, o
     onPick(p);
   }
 
-  const showResults = results.length > 0;
-  const showChips = !showResults && showSuggest;
+  // Dragged the handle below the threshold: collapse to just the search bar.
+  const collapsed = panelH < COLLAPSE_AT;
+  const showResults = results.length > 0 && !collapsed;
+  const showChips = !showResults && showSuggest && !collapsed;
   function distLabel(p: Place): string {
     return near ? formatDistance(straightLineM(near, p.coord), 'mi') : '';
   }
@@ -190,7 +195,7 @@ export default function SearchPanel({ near, onPick, onOpenProfile, onCategory, o
         </View>
 
         {/* Results (when typing or after a category search) */}
-        {results.length > 0 && (
+        {showResults && (
           <ScrollView style={{ height: panelH }} keyboardShouldPersistTaps="handled">
             {results.map((r) => (
               <View key={r.id} style={styles.resRow}>
@@ -241,7 +246,7 @@ export default function SearchPanel({ near, onPick, onOpenProfile, onCategory, o
             {/* Recents (or area recommendations) — bubble-card list, full height
                 so the search panel is pre-stretched toward the middle. */}
             <Text style={styles.recentHead}>{placesHead}</Text>
-            <ScrollView style={{ height: PANEL_H }} keyboardShouldPersistTaps="handled">
+            <ScrollView style={{ height: panelH }} keyboardShouldPersistTaps="handled">
               {places.length > 0 ? (
                 <View style={styles.recentCard}>
                   {places.map((r, i) => {
@@ -282,11 +287,12 @@ export default function SearchPanel({ near, onPick, onOpenProfile, onCategory, o
 
         {(showResults || showChips) && <View style={styles.hr} />}
 
-        {/* Input bar with profile on the right end */}
+        {/* Input bar: search lens on the left, profile on the right end */}
         <View style={styles.inputBar}>
+          <Ionicons name="search" size={20} color="rgba(255,255,255,0.6)" style={styles.lens} />
           <TextInput
             style={styles.input}
-            placeholder="Search Maps"
+            placeholder="MAP WRLDS"
             placeholderTextColor="rgba(255,255,255,0.45)"
             value={query}
             onChangeText={setQuery}
@@ -294,11 +300,7 @@ export default function SearchPanel({ near, onPick, onOpenProfile, onCategory, o
             autoCorrect={false}
             returnKeyType="search"
           />
-          {loading ? (
-            <ActivityIndicator color="rgba(255,255,255,0.6)" />
-          ) : (
-            <Text style={styles.mag}>🔍</Text>
-          )}
+          {loading && <ActivityIndicator color="rgba(255,255,255,0.6)" />}
           {onOpenProfile && (
             <>
               <View style={styles.vdivider} />
@@ -379,7 +381,10 @@ const styles = StyleSheet.create({
 
   hr: { height: 1, backgroundColor: 'rgba(255,255,255,0.09)', marginVertical: 6, marginHorizontal: 4 },
 
-  inputBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4 },
+  handleHit: { alignItems: 'center', paddingTop: 8, paddingBottom: 6 },
+  handle: { width: 44, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.35)' },
+  inputBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 4, gap: 6 },
+  lens: { marginRight: 2 },
   input: { flex: 1, color: '#ffffff', fontSize: 17, paddingVertical: 10, letterSpacing: -0.3 },
   mag: { fontSize: 16, color: 'rgba(255,255,255,0.6)', paddingHorizontal: 6 },
   vdivider: { width: 1, height: 26, backgroundColor: 'rgba(255,255,255,0.18)', marginHorizontal: 8 },

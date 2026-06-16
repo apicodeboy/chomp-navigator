@@ -8,6 +8,7 @@ import MapScreen from '@/components/MapScreen';
 import { SkinStoreProvider } from '@/store/useSkinStore';
 import { TicketsProvider } from '@/store/useTickets';
 import { SettingsProvider } from '@/store/useSettings';
+import { MapStyleProvider } from '@/store/useMapStyle';
 import { theme } from '@/theme';
 
 /**
@@ -22,8 +23,10 @@ export default function App() {
         <TicketsProvider>
           <SkinStoreProvider>
             <SettingsProvider>
-              <StatusBar style="light" />
-              <MapScreen />
+              <MapStyleProvider>
+                <StatusBar style="light" />
+                <MapScreen />
+              </MapStyleProvider>
             </SettingsProvider>
           </SkinStoreProvider>
         </TicketsProvider>

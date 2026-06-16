@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Mapbox from '@rnmapbox/maps';
 import { NAV } from '@/config/mapbox';
-import { routeBounds } from '@/utils/geo';
 import { makeRouteSampler } from '@/utils/routeSampler';
 import ChomperMarker, { type ChomperSkin } from './ChomperMarker';
 import type { NavProgress, NavRoute, UserFix } from '@/types/navigation';
@@ -12,12 +11,17 @@ interface Props {
   isNav: boolean;
   isPreview: boolean;
   route: NavRoute | null;
+  /** All alternatives — so the preview camera frames every route at once. */
+  routes: NavRoute[];
   fix: UserFix | null;
   progress: NavProgress | null;
   skin: ChomperSkin;
   /** When false (user panned away), the character keeps moving but the camera
    * stays put until they tap Re-center. */
   following: boolean;
+  /** Idle (non-nav) follow lock — drives native followUserLocation so a pan
+   * frees the map and Re-center snaps it back. */
+  idleFollow: boolean;
   /** When set (a place is selected but not yet routing), the camera hovers over
    * this coordinate instead of following the user — Apple-Maps place preview. */
   focusCoord?: Position | null;
@@ -51,10 +55,12 @@ export default function MapFollower({
   isNav,
   isPreview,
   route,
+  routes,
   fix,
   progress,
   skin,
   following,
+  idleFollow,
   focusCoord,
 }: Props) {
   const sampler = useMemo(() => (route ? makeRouteSampler(route.line) : null), [route]);
@@ -157,18 +163,12 @@ export default function MapFollower({
   }, [isNav, sampler, cameraRef]);
 
   // Camera props for the non-navigating phases (the loop drives nav imperatively).
+  // Preview framing is handled imperatively by MapScreen (a declarative→
+  // declarative camera switch doesn't reliably re-fit), so we leave the camera
+  // uncontrolled here during preview.
   const cameraProps =
-    isPreview && route
-      ? {
-          bounds: {
-            ...routeBounds(route.line),
-            paddingTop: 120,
-            paddingBottom: 260,
-            paddingLeft: 60,
-            paddingRight: 60,
-          },
-          animationDuration: 600,
-        }
+    isPreview
+      ? {}
       : !isNav && focusCoord
         ? {
             // Hover over the selected place (place-preview step).
@@ -177,14 +177,14 @@ export default function MapFollower({
             animationDuration: 600,
           }
         : !isNav
-          ? { followUserLocation: true, followZoomLevel: NAV.FOLLOW_ZOOM }
+          ? { followUserLocation: idleFollow, followZoomLevel: NAV.FOLLOW_ZOOM }
           : {};
 
   return (
     <>
       <Mapbox.Camera ref={cameraRef} {...cameraProps} />
       {isNav && marker && (
-        <ChomperMarker coordinate={marker.position} rotationDeg={0} skin={skin} size={115} />
+        <ChomperMarker coordinate={marker.position} rotationDeg={0} skin={skin} size={115} mode="nav" />
       )}
     </>
   );

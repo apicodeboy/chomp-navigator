@@ -2,6 +2,7 @@ import {
   along,
   bbox,
   bearing,
+  featureCollection,
   length,
   lineString,
   nearestPointOnLine,
@@ -93,6 +94,24 @@ export function routeBounds(line: Feature<LineString>): {
 } {
   const [minX, minY, maxX, maxY] = bbox(line);
   return { ne: [maxX, maxY], sw: [minX, minY] };
+}
+
+/**
+ * Combined bounding box over several lines — used to frame ALL route
+ * alternatives in the preview camera so every option is visible at once.
+ */
+export function routesBounds(lines: Feature<LineString>[]): {
+  ne: Position;
+  sw: Position;
+} {
+  const [minX, minY, maxX, maxY] = bbox(featureCollection(lines));
+  return { ne: [maxX, maxY], sw: [minX, minY] };
+}
+
+/** Point at the halfway distance along a line (a good ETA-bubble anchor). */
+export function midpoint(line: Feature<LineString>): Position {
+  const half = lineLengthM(line) / 2;
+  return along(line, half / 1000, KM).geometry.coordinates;
 }
 
 /** First and last coordinates of a line (origin/destination markers). */

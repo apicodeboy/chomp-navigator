@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Mapbox from '@rnmapbox/maps';
+import { Ionicons } from '@expo/vector-icons';
 import { NAV } from '@/config/mapbox';
 import { useUserLocation } from '@/hooks/useUserLocation';
 import { useNavigation } from '@/hooks/useNavigation';
@@ -37,7 +38,7 @@ import { useSettings } from '@/store/useSettings';
 import { addFavorite, isFavorite } from '@/lib/favorites';
 import { addRecent } from '@/lib/recents';
 import { formatDistance, formatDuration } from '@/utils/format';
-import { routeBounds, straightLineM } from '@/utils/geo';
+import { routeBounds, routesBounds, straightLineM } from '@/utils/geo';
 import { theme } from '@/theme';
 import type { Place } from '@/types/navigation';
 import type { Position } from 'geojson';
@@ -55,6 +56,10 @@ export default function MapScreen() {
   const tickets = useTickets();
   const cameraRef = useRef<React.ElementRef<typeof Mapbox.Camera>>(null);
   const reportedRef = useRef(false);
+  // After a deliberate Re-center we briefly ignore gesture-driven follow-release
+  // so the catch-up animation (and any finger momentum) can't instantly cancel
+  // it — that was the "have to press recenter many times" bug.
+  const followGuardRef = useRef(0);
 
   // selectedPlace = a place tapped in search/favorites (map hovers + shows a
   // detail card). routingTo = the destination we actually route to, set when the
@@ -73,6 +78,11 @@ export default function MapScreen() {
   // Chase-cam lock. The map auto-follows the character; panning releases it and
   // surfaces the Re-center button (like Apple Maps).
   const [following, setFollowing] = useState(true);
+  // Idle follow lock: when true the map follows the user via Mapbox's native
+  // followUserLocation; a pan releases it. Re-center re-engages it (toggling
+  // follow-mode is the reliable way to snap back — an imperative setCamera is
+  // ignored while followUserLocation is on).
+  const [idleFollow, setIdleFollow] = useState(true);
   // Reported by the bottom search bar so the idle buttons float just above it.
   const [searchInfo, setSearchInfo] = useState({ height: 150, keyboardOpen: false });
   // Nearby feature (gas / food / EV / hotels within RADIUS_MILES).
@@ -166,6 +176,7 @@ export default function MapScreen() {
     setAddingStop(false);
     setStarted(false);
     setNearbyResults([]);
+    setIdleFollow(true); // re-engage idle follow once back on the map
   }
 
   // The route is "active" once a destination is picked (place card, route
@@ -179,13 +190,15 @@ export default function MapScreen() {
     setFollowing(false);
     const apply = () => {
       if (route) {
+        // In preview, fit every alternative; while navigating, the active route.
+        const lines = (isPreview && routes.length ? routes : [route]).map((r) => r.line);
         cameraRef.current?.setCamera({
           bounds: {
-            ...routeBounds(route.line),
-            paddingTop: 140,
-            paddingBottom: 280,
-            paddingLeft: 60,
-            paddingRight: 60,
+            ...routesBounds(lines),
+            paddingTop: 150,
+            paddingBottom: 300,
+            paddingLeft: 70,
+            paddingRight: 70,
           },
           animationDuration: 500,
         });
@@ -221,18 +234,50 @@ export default function MapScreen() {
     if (isNav) setFollowing(true);
   }, [isNav]);
 
+  // Preview: as soon as the alternatives load, zoom OUT to frame every route at
+  // once so both/all options + their ETA bubbles are visible. Driven imperatively
+  // (the declarative camera doesn't reliably re-fit on a phase switch). Keyed on
+  // the route count so it fires once per fetch, not on every re-render or when
+  // the user taps a bubble to change the selection.
+  const previewRouteCount = isPreview ? routes.length : 0;
+  useEffect(() => {
+    if (!isPreview || routes.length === 0) return;
+    const lines = routes.map((r) => r.line);
+    const apply = () =>
+      cameraRef.current?.setCamera({
+        bounds: {
+          ...routesBounds(lines),
+          paddingTop: 150,
+          paddingBottom: 300,
+          paddingLeft: 70,
+          paddingRight: 70,
+        },
+        animationDuration: 600,
+      });
+    requestAnimationFrame(() => requestAnimationFrame(apply));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPreview, previewRouteCount]);
+
   // Re-center: during navigation re-lock the follow cam; otherwise snap back to
   // the user's current location.
   function recenter() {
+    // Guard so the snap-back animation's own camera events don't immediately
+    // trip the "user panned" release on the next frame.
+    followGuardRef.current = Date.now() + 1000;
     if (isNav) {
       setFollowing(true);
       return;
     }
+    // Idle: re-engage native follow (the reliable way to snap back). Toggle it
+    // off→on even if it was already on, so a stale-but-centered state still
+    // re-centers; the imperative setCamera covers the un-followed case.
+    setIdleFollow(false);
+    requestAnimationFrame(() => setIdleFollow(true));
     if (fix) {
       cameraRef.current?.setCamera({
         centerCoordinate: fix.coord,
         zoomLevel: NAV.FOLLOW_ZOOM,
-        animationDuration: 500,
+        animationDuration: 350,
       });
     }
   }
@@ -255,8 +300,12 @@ export default function MapScreen() {
         scaleBarEnabled={false}
         compassEnabled
         onCameraChanged={(s) => {
-          // A user pan/zoom/rotate during navigation releases the chase cam.
-          if (isNav && s.gestures.isGestureActive) setFollowing(false);
+          if (!s.gestures.isGestureActive) return;
+          // A user pan/zoom/rotate releases the follow lock and surfaces
+          // Re-center — but not within the guard window right after a recenter.
+          if (Date.now() <= followGuardRef.current) return;
+          if (isNav) setFollowing(false);
+          else setIdleFollow(false);
         }}
       >
         <MapFollower
@@ -264,10 +313,12 @@ export default function MapScreen() {
           isNav={isNav}
           isPreview={isPreview}
           route={route}
+          routes={routes}
           fix={fix}
           progress={progress}
           skin={selectedSkin}
           following={following}
+          idleFollow={idleFollow}
           focusCoord={selectedPlace && !routingTo ? selectedPlace.coord : null}
         />
 
@@ -301,7 +352,13 @@ export default function MapScreen() {
 
         {/* Preview: route alternatives + endpoints. */}
         {isPreview && routes.length > 0 && (
-          <PreviewLayer routes={routes} selectedIndex={selectedIndex} color={lineColor} />
+          <PreviewLayer
+            routes={routes}
+            selectedIndex={selectedIndex}
+            color={lineColor}
+            units={units}
+            onSelectRoute={selectRoute}
+          />
         )}
 
         {/* Navigation: solid route line (color from Settings) + character. */}
@@ -339,9 +396,7 @@ export default function MapScreen() {
             <Text style={styles.previewSub}>{formatDistance(placeDistanceM, units)} away</Text>
           )}
           <View style={styles.previewBtns}>
-            <TouchableOpacity style={styles.cancelBtn} activeOpacity={0.55} onPress={cancel}>
-              <Text style={styles.cancelText}>Back</Text>
-            </TouchableOpacity>
+            <GoldButton variant="red" label="Back" style={styles.cancelFlex} onPress={cancel} />
             <GoldButton label="Go ▶" style={styles.goFlex} onPress={() => setRoutingTo(selectedPlace)} />
           </View>
         </View>
@@ -382,9 +437,7 @@ export default function MapScreen() {
             </View>
           )}
           <View style={styles.previewBtns}>
-            <TouchableOpacity style={styles.cancelBtn} activeOpacity={0.55} onPress={cancel}>
-              <Text style={styles.cancelText}>Cancel</Text>
-            </TouchableOpacity>
+            <GoldButton variant="red" label="Cancel" style={styles.cancelFlex} onPress={cancel} />
             <GoldButton
               label="Start ▶"
               style={styles.goFlex}
@@ -449,12 +502,16 @@ export default function MapScreen() {
         <>
           <TouchableOpacity
             style={[styles.fab, styles.fabDark, { bottom: 30 + searchInfo.height }]}
+            activeOpacity={0.6}
+            hitSlop={8}
             onPress={() => setStoreOpen(true)}
           >
             <Image source={ICON_STORE} style={styles.fabFill} resizeMode="cover" />
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.fab, { bottom: 30 + searchInfo.height + 72 }]}
+            activeOpacity={0.6}
+            hitSlop={8}
             onPress={recenter}
           >
             <Image source={ICON_RECENTER} style={styles.fabImg} resizeMode="contain" />
@@ -464,17 +521,19 @@ export default function MapScreen() {
       {/* Route active: overview + recenter + audio. */}
       {inRoute && (
         <>
-          <TouchableOpacity style={[styles.fab, styles.fabPos1]} onPress={overview}>
+          <TouchableOpacity style={[styles.fab, styles.fabPos1]} activeOpacity={0.6} hitSlop={8} onPress={overview}>
             <Image source={ICON_OVERVIEW} style={styles.fabImg} resizeMode="contain" />
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.fab, styles.fabPos2, isNav && !following && styles.fabRecenterActive]}
+            activeOpacity={0.6}
+            hitSlop={8}
             onPress={recenter}
           >
             <Image source={ICON_RECENTER} style={styles.fabImg} resizeMode="contain" />
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.fab, styles.fabPos3]} onPress={() => setVoiceOn(!voiceOn)}>
-            <Text style={styles.fabIcon}>{voiceOn ? '🔊' : '🔇'}</Text>
+          <TouchableOpacity style={[styles.fab, styles.fabPos3]} activeOpacity={0.6} hitSlop={8} onPress={() => setVoiceOn(!voiceOn)}>
+            <Ionicons name={voiceOn ? 'volume-high' : 'volume-mute'} size={28} color={theme.colors.textPrimary} />
           </TouchableOpacity>
         </>
       )}
@@ -562,6 +621,7 @@ const styles = StyleSheet.create({
   cancelBtn: { flex: 1, paddingVertical: 14, borderRadius: theme.radius.sm, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center' },
   cancelText: { color: '#ffffff', fontWeight: '700', fontSize: 16 },
   goFlex: { flex: 2 },
+  cancelFlex: { flex: 1 },
   goStretch: { alignSelf: 'stretch' },
 
   arrived: { ...card, bottom: 24, alignItems: 'center', gap: 12 },

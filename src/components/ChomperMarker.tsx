@@ -18,15 +18,23 @@ export interface ChomperSkin {
   /**
    * Optional full-art image (require(...)). When set, the marker renders this
    * static artwork instead of the animated sprite sheet (no chomp animation).
+   * Used for BOTH idle and navigating unless `navImage` overrides nav.
    */
   image?: ReturnType<typeof require>;
+  /**
+   * Optional override used ONLY while navigating. Lets the default skin show a
+   * different idle vs. nav marker (e.g. gold disk when idle → black arrow once a
+   * route starts). Selected characters omit this, so they stay the same in both.
+   */
+  navImage?: ReturnType<typeof require>;
 }
 
-/** Default placeholder skin. ⬅️ Swap `chomper.png` for your own art before shipping. */
+/** Default fallback skin: gold disk when idle, black arrow while navigating. */
 export const DEFAULT_SKIN: ChomperSkin = {
-  sheet: require('../../assets/chomper.png'),
-  frames: 6,
-  frameSize: 128,
+  image: require('../../assets/marker-disk.png'),
+  navImage: require('../../assets/marker-arrow.png'),
+  frames: 1,
+  frameSize: 256,
 };
 
 interface Props {
@@ -43,6 +51,8 @@ interface Props {
   /** Chomp animation frames per second. */
   fps?: number;
   skin?: ChomperSkin;
+  /** 'nav' selects the skin's navImage (the default skin's arrow). */
+  mode?: 'idle' | 'nav';
 }
 
 /**
@@ -53,26 +63,32 @@ export function ChomperSprite({
   skin,
   size,
   fps = 10,
+  mode = 'idle',
 }: {
   skin: ChomperSkin;
   size: number;
   fps?: number;
+  mode?: 'idle' | 'nav';
 }) {
+  // While navigating, prefer the skin's navImage (default skin's arrow); else
+  // fall back to its full-art image (selected characters use the same in both).
+  const fullArt = (mode === 'nav' && skin.navImage) || skin.image;
+
   const [frame, setFrame] = useState(0);
   useEffect(() => {
-    if (skin.image) return; // full-art skins don't animate
+    if (fullArt) return; // full-art skins don't animate
     const id = setInterval(
       () => setFrame((f) => (f + 1) % skin.frames),
       1000 / fps,
     );
     return () => clearInterval(id);
-  }, [skin.frames, fps, skin.image]);
+  }, [skin.frames, fps, fullArt]);
 
   // Full-art character: render the static image upright.
-  if (skin.image) {
+  if (fullArt) {
     return (
       <Image
-        source={skin.image}
+        source={fullArt}
         style={{ width: size, height: size }}
         resizeMode="contain"
       />
@@ -101,6 +117,7 @@ export default function ChomperMarker({
   size = 46,
   fps = 10,
   skin = DEFAULT_SKIN,
+  mode = 'idle',
 }: Props) {
   // Smoothly animate rotation so the chomper doesn't snap when the bearing jumps.
   const rot = useRef(new Animated.Value(rotationDeg)).current;
@@ -125,7 +142,7 @@ export default function ChomperMarker({
       allowOverlap
     >
       <Animated.View style={{ transform: [{ rotate: spin }] }}>
-        <ChomperSprite skin={skin} size={size} fps={fps} />
+        <ChomperSprite skin={skin} size={size} fps={fps} mode={mode} />
       </Animated.View>
     </Mapbox.MarkerView>
   );
